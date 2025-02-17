@@ -226,7 +226,7 @@ int main() {
 
   char c;
 
-  // Set Up 1st order and Second order low pass filters
+  // Set Up 1st order and 2nd order low pass filters
   // As and Bs are calculated from GNU octave
   // Use GNU octave signal package and butter function
   double omega_bs[2] = {0.086364, 0.086364};
