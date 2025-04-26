@@ -63,6 +63,7 @@ private:
 
 
 
+
   // Function to rotate a vector using roll (X-axis) and pitch (Y-axis)
   Eigen::Vector3d rotateVector(const Eigen::Vector3d &v, double roll, double pitch) {
     // Create roll rotation matrix (rotation about X-axis)
@@ -79,13 +80,6 @@ private:
   }
 
 
-  double compute_y(double x) {  // this function was generated through least square estimate curve fitting
-    // Evaluate y = 324.9038 - 0.8249779*x + 0.000784277*x^2 - 3.264981e-7*x^3 + 4.990982e-11*x^4
-    // using Horner's method.
-    return 324.9038 + x * (-0.8249779 + x * (0.000784277 + x * (-3.264981e-7 + x * 4.990982e-11)));
-  }
-
-
   double get_cov(double val) {
     // if (val != 70)
     //   return (1700 * 0.4 /(val - 70));
@@ -93,10 +87,7 @@ private:
 
     if (val < 2000) return 70;
     //  else return 0.09;
-    //  else return 0.09;
-    else return 2;
-
-    //  return compute_y(val);
+    else return 0.09;
   }
 
   Twist twist;
@@ -159,9 +150,9 @@ public:
     // state_cov(State::VY, State::VY) = 1;
     // state_cov(State::OMEGA, State::OMEGA) = 1;
 
-    wheel_cov(WheelMeasurement::OMEGA_L, WheelMeasurement::OMEGA_L) = 0.1;
-    wheel_cov(WheelMeasurement::OMEGA_R, WheelMeasurement::OMEGA_R) = 0.1;
-    wheel_cov(WheelMeasurement::OMEGA_M, WheelMeasurement::OMEGA_M) = 0.1;
+    wheel_cov(WheelMeasurement::OMEGA_L, WheelMeasurement::OMEGA_L) = 1;
+    wheel_cov(WheelMeasurement::OMEGA_R, WheelMeasurement::OMEGA_R) = 1;
+    wheel_cov(WheelMeasurement::OMEGA_M, WheelMeasurement::OMEGA_M) = 1;
 
 
     tf_cov(TFMiniMeasurement::D1, TFMiniMeasurement::D1) = 0.1;
@@ -244,6 +235,6 @@ public:
     
     mini.setCovarianceSquareRoot(tf_cov);
     
-    x_ekf = ekf.update(mini, min, time);
+    x_ekf = ekf.update(mini, min, time, true, 1);
   }
 };

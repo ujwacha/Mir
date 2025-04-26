@@ -1,2 +1,5 @@
 /CMakeLists.txt~
 /build/
+/src/main.cpp~
+/src/node.hpp~
+/src/KalmanFilter.hpp~

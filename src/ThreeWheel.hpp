@@ -63,7 +63,7 @@ namespace Robot {
       measurement.omega_r() = right.calculate(x.theta(), x.vx(), x.vy(), x.omega()).omega;
       measurement.omega_m() = mid.calculate(x.theta(), x.vx(), x.vy(), x.omega()).omega;
 
-      std::cout << "Measurement Is " << std::endl << measurement << std::endl;
+      // std::cout << "Measurement Is " << std::endl << measurement << std::endl;
 
       return measurement;
     }
@@ -105,10 +105,10 @@ namespace Robot {
       this->H(M::OMEGA_M, S::AY) = 0;
 
 
-      std::cout << "Wheel Jacobian Updated" << std::endl;
-      std::cout << "Wheel H is" << std::endl;
-      std::cout << this->H << std::endl;
-      std::cout << std::endl << std::endl;
+      // std::cout << "Wheel Jacobian Updated" << std::endl;
+      // std::cout << "Wheel H is" << std::endl;
+      // std::cout << this->H << std::endl;
+      // std::cout << std::endl << std::endl;
     }
 
   };
