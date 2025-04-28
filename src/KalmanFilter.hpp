@@ -14,7 +14,10 @@
 #include "kalman/ExtendedKalmanFilter.hpp"
 #include "kalman/Types.hpp"
 #include "ThreeWheel.hpp"
-#include "TFMiniMeasurementModek.hpp"
+//#include "TFMiniMeasurementModek.hpp"
+#include "TwoDistanceSensorsMeasurementModel.hpp"
+
+
 #include <Eigen/Dense>
 
 #include "filter.h"
@@ -40,13 +43,14 @@ typedef Robot::SystemModel<T> SystemModel;
 typedef Robot::OdomMeasurement<T> OdomMeasurement;
 typedef Robot::ImuMeasurement<T> ImuMeasurement;
 typedef Robot::WheelMeasurement<T> WheelMeasurement;
-typedef Robot::TFMiniMeasurement<T> TFMiniMeasurement;
+// typedef Robot::TFMiniMeasurement<T> TFMiniMeasurement;
+typedef Robot::TwoSensorsMeasurement<T> TwoSensorsMeasurement;
 
 typedef Robot::OdomMeasurementModel<T> OdomMeasurementModel;
 typedef Robot::ImuMeasurementModel<T> ImuMeasurementModel;
 typedef Robot::WheelMeasurementModel<T> WheelMeasurementModel;
-typedef Robot::TFMiniMeasurementModel<T> TFMiniMeasurementModel;
-
+// typedef Robot::TFMiniMeasurementModel<T> TFMiniMeasurementModel;
+typedef Robot::TwoSensorsMeasurementModel<T> TwoSensorsMeasurementModel;
 
 
 
@@ -102,13 +106,19 @@ private:
   WheelMeasurementModel wheel_model{0, LEFT_RADIUS, 0, 0, -RIGHT_RADIUS, 0, -MID_RADIUS, 0 , PI/2 , WHEEL_D/2};
 
 
-  TFMiniMeasurementModel mini{0, 0.3, PI/2, 0.3, -PI/2, 0.3, 4, 7.5};
+  //  TFMiniMeasurementModel mini{0, 0.3, PI/2, 0.3, -PI/2, 0.3, 4, 7.5};
   //TFMiniMeasurementModel mini(PI/2, 0.2, 0, 0.2, -PI/2, 0.2, 4, 7.5);
+  TwoSensorsMeasurementModel sensor_left{0, 0.3, PI/2, 0.3, 4, 7.5};
+  TwoSensorsMeasurementModel sensor_right{0, 0.3, -PI/2, 0.3, 4, 7.5};
+
 
   Kalman::Covariance<ImuMeasurement> imu_cov;
   Kalman::Covariance<WheelMeasurement> wheel_cov;
   Kalman::Covariance<State> state_cov;
-  Kalman::Covariance<TFMiniMeasurement> tf_cov;
+  // Kalman::Covariance<TFMiniMeasurement> tf_cov;
+  Kalman::Covariance<TwoSensorsMeasurement> cov_right;
+  Kalman::Covariance<TwoSensorsMeasurement> cov_left;
+
 
 
 
@@ -155,9 +165,12 @@ public:
     wheel_cov(WheelMeasurement::OMEGA_M, WheelMeasurement::OMEGA_M) = 1;
 
 
-    tf_cov(TFMiniMeasurement::D1, TFMiniMeasurement::D1) = 0.1;
-    tf_cov(TFMiniMeasurement::D2, TFMiniMeasurement::D2) = 0.1;
-    tf_cov(TFMiniMeasurement::D3, TFMiniMeasurement::D3) = 0.1;
+    // tf_cov(TFMiniMeasurement::D1, TFMiniMeasurement::D1) = 0.1;
+    // tf_cov(TFMiniMeasurement::D2, TFMiniMeasurement::D2) = 0.1;
+    // tf_cov(TFMiniMeasurement::D3, TFMiniMeasurement::D3) = 0.1;
+
+    cov_right.setIdentity();
+    cov_left.setIdentity();
 
 
     imu_cov(ImuMeasurement::AX, ImuMeasurement::AX) = 1;
@@ -167,8 +180,8 @@ public:
 
     imu_model.setCovariance(imu_cov);
     wheel_model.setCovariance(wheel_cov);
-    mini.setCovariance(tf_cov);
-    /// Set Covariance Of State Model
+    //mini.setCovariance(tf_cov);
+    // Set Covariance Of State Model
     sys.setCovariance(state_cov);
  
     ekf.init(state);
@@ -224,17 +237,58 @@ public:
   }
 
   void distance_update(Distance_Sensors msg, double time) {
-    TFMiniMeasurement min;
-    min.d1() = msg.d_mid/100;
-    min.d3() = msg.d_left/100;
-    min.d2() = msg.d_right/100;
+    // TFMiniMeasurement min;
+    // min.d1() = msg.d_mid/100;
+    // min.d3() = msg.d_left/100;
+    // min.d2() = msg.d_right/100;
 
-    tf_cov(TFMiniMeasurement::D1, TFMiniMeasurement::D1) = get_cov(msg.s_mid);
-    tf_cov(TFMiniMeasurement::D3, TFMiniMeasurement::D3) = get_cov(msg.s_left);
-    tf_cov(TFMiniMeasurement::D2, TFMiniMeasurement::D2) = get_cov(msg.s_right);
+    // tf_cov(TFMiniMeasurement::D1, TFMiniMeasurement::D1) = get_cov(msg.s_mid);
+    // tf_cov(TFMiniMeasurement::D3, TFMiniMeasurement::D3) = get_cov(msg.s_left);
+    // tf_cov(TFMiniMeasurement::D2, TFMiniMeasurement::D2) = get_cov(msg.s_right);
     
-    mini.setCovarianceSquareRoot(tf_cov);
+    // mini.setCovarianceSquareRoot(tf_cov);
     
-    x_ekf = ekf.update(mini, min, time);
+    // x_ekf = ekf.update(mini, min, time);
+
+    
+    TwoSensorsMeasurement right;
+    TwoSensorsMeasurement left;
+
+
+    // min.d1() = dm[i]/100;
+    // min.d3() = dl[i]/100;
+    // min.d2() = dr[i]/100;
+
+    right.d1() = msg.d_mid/100;
+    right.d2() = msg.d_left/100;
+      
+    left.d1() = msg.d_mid/100;
+    left.d2() = msg.d_right/100;
+      
+      
+
+
+    cov_right(TwoSensorsMeasurement::D1, TwoSensorsMeasurement::D1) = 0.09;
+    cov_right(TwoSensorsMeasurement::D2, TwoSensorsMeasurement::D2) = 0.09;
+
+    cov_left(TwoSensorsMeasurement::D1, TwoSensorsMeasurement::D1) = 0.09;
+    cov_left(TwoSensorsMeasurement::D2, TwoSensorsMeasurement::D2) = 0.09;
+
+    sensor_right.setCovarianceSquareRoot(cov_right);
+    sensor_left.setCovarianceSquareRoot(cov_left);
+
+
+    // std::cout << "REAL d1 : " << min.d1() << std::endl
+    // 		<< "REAL d2 : " << min.d2() << std::endl
+    // 		<< "REAL d3 : " << min.d3() << std::endl;
+
+
+    //if (i % 300 == 0 || i < 250) 
+    // x_ekf = ekf.update(mini, min, time);
+
+    x_ekf = ekf.update(sensor_right, right, time, true, 1.5);
+    x_ekf = ekf.update(sensor_left, left, time, true, 1.5);
+
+
   }
 };
