@@ -188,7 +188,7 @@ void strength_callback(
     Kalman.predict(msg, time);
 
     Kalman.wheel_update(odom_msg, time);
-    //    Kalman.imu_update(imu_data, time);
+    Kalman.imu_update(imu_data, time);
     Kalman.distance_update(dis_mrl, time);
 
     prev_time = this->now().seconds();

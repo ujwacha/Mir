@@ -85,7 +85,7 @@ private:
     //   return (1700 * 0.4 /(val - 70));
     // else return 100;
 
-    if (val < 2000) return 70;
+    if (val < 1000) return 70;
     //  else return 0.09;
     else return 0.09;
   }
@@ -162,7 +162,7 @@ public:
 
     imu_cov(ImuMeasurement::AX, ImuMeasurement::AX) = 1;
     imu_cov(ImuMeasurement::AY, ImuMeasurement::AY) = 1;
-    imu_cov(ImuMeasurement::YAW, ImuMeasurement::YAW) = 0.01;
+    imu_cov(ImuMeasurement::YAW, ImuMeasurement::YAW) = 0.001;
 
 
     imu_model.setCovariance(imu_cov);
@@ -235,6 +235,6 @@ public:
     
     mini.setCovarianceSquareRoot(tf_cov);
     
-    x_ekf = ekf.update(mini, min, time, true, 1);
+    x_ekf = ekf.update(mini, min, time);
   }
 };
