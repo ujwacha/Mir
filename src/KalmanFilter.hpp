@@ -155,6 +155,14 @@ public:
 
   
     state_cov.setIdentity();
+    state_cov /= 100; // for now, must change later
+
+    state_cov(State::VX, State::VX) = 2;
+    state_cov(State::VY, State::VY) = 2;
+    state_cov(State::OMEGA, State::OMEGA) = 0.5;
+    state_cov(State::AX, State::AX) = 4;
+    state_cov(State::AY, State::AY) = 4;
+
 
     // state_cov(State::VX, State::VX) = 1;
     // state_cov(State::VY, State::VY) = 1;
@@ -260,10 +268,10 @@ public:
     // min.d2() = dr[i]/100;
 
     right.d1() = msg.d_mid/100;
-    right.d2() = msg.d_left/100;
+    right.d2() = msg.d_right/100;
       
     left.d1() = msg.d_mid/100;
-    left.d2() = msg.d_right/100;
+    left.d2() = msg.d_left/100;
       
       
 
@@ -286,8 +294,8 @@ public:
     //if (i % 300 == 0 || i < 250) 
     // x_ekf = ekf.update(mini, min, time);
 
-    x_ekf = ekf.update(sensor_right, right, time, true, 1.5);
-    x_ekf = ekf.update(sensor_left, left, time, true, 1.5);
+    x_ekf = ekf.update(sensor_right, right, time, true, 0.8);
+    x_ekf = ekf.update(sensor_left, left, time, true, 1);
 
 
   }

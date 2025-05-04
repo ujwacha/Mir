@@ -73,7 +73,7 @@ public:
                       (std::cos(theta_s) * std::cos(theta_s) + eps);
     }
 
-    print_res(result);
+    // print_res(result);
 
     // Clamp negative distances and handle numerical instability
     if (result.distance < 0) {
