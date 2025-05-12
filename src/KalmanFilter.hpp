@@ -108,8 +108,8 @@ private:
 
   //  TFMiniMeasurementModel mini{0, 0.3, PI/2, 0.3, -PI/2, 0.3, 4, 7.5};
   //TFMiniMeasurementModel mini(PI/2, 0.2, 0, 0.2, -PI/2, 0.2, 4, 7.5);
-  TwoSensorsMeasurementModel sensor_left{0, 0.3, PI/2, 0.3, 4, 7.5};
-  TwoSensorsMeasurementModel sensor_right{0, 0.3, -PI/2, 0.3, 4, 7.5};
+  TwoSensorsMeasurementModel sensor_left{0, 0.3, 0, PI/2, 0.3, PI/2, 4, 7.5};
+  TwoSensorsMeasurementModel sensor_right{0, 0.3, 0, -PI/2, 0.3, -PI/2, 4, 7.5};
 
 
   Kalman::Covariance<ImuMeasurement> imu_cov;
@@ -244,7 +244,7 @@ public:
     x_ekf = ekf.update(imu_model, imu, time);
   }
 
-  void distance_update(Distance_Sensors msg, double time) {
+  void distance_update(Sick msg, double time) {
     // TFMiniMeasurement min;
     // min.d1() = msg.d_mid/100;
     // min.d3() = msg.d_left/100;
@@ -267,11 +267,13 @@ public:
     // min.d3() = dl[i]/100;
     // min.d2() = dr[i]/100;
 
-    right.d1() = msg.d_mid/100;
-    right.d2() = msg.d_right/100;
+
+    // all these things are not done properly
+    right.d1() = msg.d_one/100;
+    right.d2() = msg.d_two/100;
       
-    left.d1() = msg.d_mid/100;
-    left.d2() = msg.d_left/100;
+    left.d1() = msg.d_one/100;
+    left.d2() = msg.d_three/100;
       
       
 
