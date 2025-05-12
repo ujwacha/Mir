@@ -25,7 +25,7 @@
 
 #include "msgs.hpp"
 #include "KalmanFilter.hpp"
-
+#include "sick_interfaces/msg/Sick.hpp"
 
 class Sayer : public rclcpp::Node {
 private:
@@ -35,6 +35,7 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr rpy_sub;
   rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr distance_sub;
   rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr strength_sub;
+  rclcpp::Subscription<sick_interfaces::msg::Sick>::SharedPtr sick_sub;
   rclcpp::TimerBase::SharedPtr timer;
   rclcpp::Time time;
   double prev_time;
@@ -43,7 +44,8 @@ private:
   ImuData imu_data;
   OdomMsg odom_msg;
   Distance_Sensors dis_mrl;
-
+  Sick si;
+  
   KalmanFilter Kalman;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher;
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
@@ -72,43 +74,43 @@ public:
     );
 
 
-    distance_sub = this->create_subscription<geometry_msgs::msg::Vector3>(
-      "/distance_mrl/length",
-      currentqol,
-      std::bind(
-        &Sayer::distance_callback, this, std::placeholders::_1
-      )
-    );
+    // distance_sub = this->create_subscription<geometry_msgs::msg::Vector3>(
+    //   "/distance_mrl/length",
+    //   currentqol,
+    //   std::bind(
+    //     &Sayer::distance_callback, this, std::placeholders::_1
+    //   )
+    // );
 
-    strength_sub = this->create_subscription<geometry_msgs::msg::Vector3>(
-      "/distance_mrl/strength",
-      currentqol,
-      std::bind(
-        &Sayer::strength_callback, this, std::placeholders::_1
-      )
-    );
+    // strength_sub = this->create_subscription<geometry_msgs::msg::Vector3>(
+    //   "/distance_mrl/strength",
+    //   currentqol,
+    //   std::bind(
+    //     &Sayer::strength_callback, this, std::placeholders::_1
+    //   )
+    // );
 
-
-
+    sick_sub = this->create_subscription<sick_interfaces::msg::Sick>(
+        "sick/data", currentqol,
+        std::bind(&Sayer::sick_subscription_callback, this,
+                  std::placeholders::_1));
 
     imu_subscriber = this->create_subscription<sensor_msgs::msg::Imu>(
-      "imu/data_raw",
-      currentqol,
-      std::bind(&Sayer::imu_subscription_callback, this, std::placeholders::_1)
-    );
+        "imu/data_raw", currentqol,
+        std::bind(&Sayer::imu_subscription_callback, this,
+                  std::placeholders::_1));
 
     odom_subscriber = this->create_subscription<geometry_msgs::msg::Vector3>(
-      "odom_vec",
-      currentqol,
-      std::bind(&Sayer::odom_subscription_callback, this, std::placeholders::_1)
-    );
+        "odom_vec", currentqol,
+        std::bind(&Sayer::odom_subscription_callback, this,
+                  std::placeholders::_1));
 
-    timer = this->create_wall_timer(
-      std::chrono::milliseconds(10), std::bind(&Sayer::update_kalman_data, this)
-    );
-    
+    timer =
+        this->create_wall_timer(std::chrono::milliseconds(10),
+                                std::bind(&Sayer::update_kalman_data, this));
 
-    odom_publisher = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
+    odom_publisher =
+        this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
     tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
     prev_time = this->now().seconds();
@@ -116,17 +118,14 @@ public:
   }
 
   void cmd_vel_subscription_callback(
-    const geometry_msgs::msg::Twist::SharedPtr msg
-  ) {
+      const geometry_msgs::msg::Twist::SharedPtr msg) {
     RCLCPP_INFO(this->get_logger(), "cmd_vel recieved");
     twist_msg.x = msg->linear.x;
     twist_msg.y = msg->linear.y;
     twist_msg.z = msg->angular.z;
   }
 
-  void rpy_callback(
-    const geometry_msgs::msg::Vector3::SharedPtr msg
-  ) {
+  void rpy_callback(const geometry_msgs::msg::Vector3::SharedPtr msg) {
     RCLCPP_INFO(this->get_logger(), "roll, pitch, yaw recieved");
     imu_data.roll = msg->x;
     imu_data.pitch = msg->y;
@@ -140,9 +139,17 @@ public:
     dis_mrl.d_left = msg->z;
   }
 
-void strength_callback(
-    const geometry_msgs::msg::Vector3::SharedPtr msg
-  ) {
+  void sick_subscription_callback(const sick_interfaces::msg::Sick::SharedPtr msg) {
+    RCLCPP_INFO(this->get_logger(), "Sick Distances Recieved");
+    si.d_one = msg->distance_one;
+    si.d_two = msg->distance_two;
+    si.d_three = msg->distance_three;
+    si.d_four = msg->distance_four;
+
+    update_sick();
+  }
+
+  void strength_callback(const geometry_msgs::msg::Vector3::SharedPtr msg) {
 
     RCLCPP_INFO(this->get_logger(), "Strengths REcieved");
     dis_mrl.s_mid = msg->x;
@@ -150,15 +157,14 @@ void strength_callback(
     dis_mrl.s_left = msg->z;
   }
 
-
   void imu_subscription_callback(const sensor_msgs::msg::Imu::SharedPtr msg) {
     const auto &orientation = msg->orientation;
 
-    tf2::Quaternion quat(
-      orientation.x, orientation.y, orientation.z, orientation.w
-    );
+    tf2::Quaternion quat(orientation.x, orientation.y, orientation.z,
+                         orientation.w);
 
-//    tf2::Matrix3x3(quat).getRPY(imu_data.roll, imu_data.pitch, imu_data.yaw);
+    //    tf2::Matrix3x3(quat).getRPY(imu_data.roll, imu_data.pitch,
+    //    imu_data.yaw);
 
     const auto &acceleration = msg->linear_acceleration;
     imu_data.accel_x = acceleration.x;
@@ -168,7 +174,8 @@ void strength_callback(
     RCLCPP_INFO(this->get_logger(), "Accelerations Kalman Filter");
   }
 
-  void odom_subscription_callback(const geometry_msgs::msg::Vector3::SharedPtr msg) {
+  void
+  odom_subscription_callback(const geometry_msgs::msg::Vector3::SharedPtr msg) {
 
     RCLCPP_INFO(this->get_logger(), "Wheel Angular Velosities Recieved");
     odom_msg.omega_l = msg->x;
@@ -189,7 +196,7 @@ void strength_callback(
 
     Kalman.wheel_update(odom_msg, time);
     Kalman.imu_update(imu_data, time);
-    Kalman.distance_update(dis_mrl, time);
+    // Kalman.distance_update(dis_mrl, time);
 
     prev_time = this->now().seconds();
 
@@ -216,7 +223,8 @@ void strength_callback(
     odom_tf.child_frame_id = "base_link";
 
     odom_tf.transform.translation.x = Kalman.x_ekf[State::X];
-    odom_tf.transform.translation.y = Kalman.x_ekf[State::Y];;
+    odom_tf.transform.translation.y = Kalman.x_ekf[State::Y];
+    ;
     odom_tf.transform.translation.z = 0.0;
     odom_tf.transform.rotation.x = quaternion.x();
     odom_tf.transform.rotation.y = quaternion.y();
@@ -243,7 +251,7 @@ void strength_callback(
 
     // frame con
     msg.twist.twist.linear.x = vx * std::cos(theta) + vy * std::sin(theta);
-    
+
     msg.twist.twist.linear.y = -vx * std::sin(theta) + vy * std::cos(theta);
     msg.twist.twist.linear.z = 0.0;
     msg.twist.twist.angular.z = Kalman.x_ekf[State::OMEGA];

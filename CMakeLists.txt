@@ -16,7 +16,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(composition REQUIRED)
-
+find_package(sick_interfaces REQUIRED)
 
 
 find_package(Eigen3 REQUIRED)
@@ -39,6 +39,7 @@ ament_target_dependencies(${PROJECT_NAME}
   std_msgs
   geometry_msgs
   rclcpp_components
+  sick_interfaces
 )
 
 install(TARGETS

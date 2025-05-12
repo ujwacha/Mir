@@ -28,3 +28,10 @@ struct Distance_Sensors {
   uint16_t s_left;
 };
 
+
+struct Sick {
+  float d_one;
+  float d_two;
+  float d_three;
+  float d_four;
+};
