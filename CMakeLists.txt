@@ -33,13 +33,13 @@ include_directories(
 add_executable(${PROJECT_NAME} src/main.cpp)
 
 ament_target_dependencies(${PROJECT_NAME}
+  sick_interfaces
   nav_msgs sensor_msgs
   tf2_ros
   rclcpp
   std_msgs
   geometry_msgs
   rclcpp_components
-  sick_interfaces
 )
 
 install(TARGETS

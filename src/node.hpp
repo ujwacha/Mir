@@ -25,7 +25,8 @@
 
 #include "msgs.hpp"
 #include "KalmanFilter.hpp"
-#include "sick_interfaces/msg/Sick.hpp"
+
+#include "sick_interfaces/msg/sick.hpp"
 
 class Sayer : public rclcpp::Node {
 private:
@@ -146,8 +147,21 @@ public:
     si.d_three = msg->distance_three;
     si.d_four = msg->distance_four;
 
-    update_sick();
+    Twist_msg msg_twist; // just for now, later better systems will be used
+    msg_twist.x = 0;
+    msg_twist.y = 0;
+    msg_twist.z = 0;
+
+    double time = this->now().seconds() - prev_time;
+    Kalman.predict(msg_twist, time);
+    Kalman.distance_update(si, time);
+
+    prev_time = this->now().seconds();
+
+    RCLCPP_INFO(this->get_logger(), "Updated Kalman Filter [SICK]");
+    publish();
   }
+
 
   void strength_callback(const geometry_msgs::msg::Vector3::SharedPtr msg) {
 
@@ -193,8 +207,8 @@ public:
     msg.z = 0;
 
     Kalman.predict(msg, time);
-
     Kalman.wheel_update(odom_msg, time);
+
     Kalman.imu_update(imu_data, time);
     // Kalman.distance_update(dis_mrl, time);
 
