@@ -290,16 +290,16 @@ public:
     fourth_quardrant.d2() = msg.d_one/100;
 
     if (msg.works_one && msg.works_two)
-      x_ekf = ekf.update(sensor_first_quardrant_x_y, first_quardrant, time);
+      x_ekf = ekf.update(sensor_first_quardrant_x_y, first_quardrant, time, true, 0.8);
 
     if (msg.works_two && msg.works_three)
-      x_ekf = ekf.update(sensor_second_quardrant_y_min_x, second_quardrant, time);
+      x_ekf = ekf.update(sensor_second_quardrant_y_min_x, second_quardrant, time, true, 0.8);
 
     if (msg.works_three && msg.works_four)
-      x_ekf = ekf.update(sensor_third_quardrant_min_x_min_y, third_quardrant, time);
+      x_ekf = ekf.update(sensor_third_quardrant_min_x_min_y, third_quardrant, time, true, 0.8);
 
     if (msg.works_four && msg.works_one)
-      x_ekf = ekf.update(sensor_fourth_quardrant_x_min_y, fourth_quardrant, time);
+      x_ekf = ekf.update(sensor_fourth_quardrant_x_min_y, fourth_quardrant, time, true, 0.8);
 
   }
 };
