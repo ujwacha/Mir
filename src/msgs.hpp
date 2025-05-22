@@ -31,7 +31,11 @@ struct Distance_Sensors {
 
 struct Sick {
   float d_one;
+  bool works_one;
   float d_two;
+  bool works_two;
   float d_three;
+  bool works_three;
   float d_four;
+  bool works_four;
 };

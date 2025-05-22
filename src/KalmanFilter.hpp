@@ -18,7 +18,6 @@
 #include "TwoDistanceSensorsMeasurementModel.hpp"
 
 
-#include <Eigen/Dense>
 
 #include "filter.h"
 
@@ -30,7 +29,6 @@
 #define RIGHT_RADIUS 0.32
 #define LEFT_RADIUS 0.165
 
-#define WHEEL_D 0.0574
 //#define WHEEL_D 0.0474
 
 
@@ -103,21 +101,29 @@ private:
   // Encoder<float> enc2(0, LEFT_RADIUS, 0, WHEEL_D/2);
   // Encoder<float> enc3(0, -RIGHT_RADIUS, 0, WHEEL_D/2);
 
-  WheelMeasurementModel wheel_model{0, LEFT_RADIUS, 0, 0, -RIGHT_RADIUS, 0, -MID_RADIUS, 0 , PI/2 , WHEEL_D/2};
-
+  // WheelMeasurementModel wheel_model{0, LEFT_RADIUS, 0, 0, -RIGHT_RADIUS, 0, -MID_RADIUS, 0 , PI/2 , WHEEL_D/2};
 
   //  TFMiniMeasurementModel mini{0, 0.3, PI/2, 0.3, -PI/2, 0.3, 4, 7.5};
   //TFMiniMeasurementModel mini(PI/2, 0.2, 0, 0.2, -PI/2, 0.2, 4, 7.5);
-  TwoSensorsMeasurementModel sensor_left{0, 0.3, 0, PI/2, 0.3, PI/2, 4, 7.5};
-  TwoSensorsMeasurementModel sensor_right{0, 0.3, 0, -PI/2, 0.3, -PI/2, 4, 7.5};
+  // TwoSensorsMeasurementModel sensor_left{0, 0.3, 0, PI/2, 0.3, PI/2, 4, 7.5};
+  // TwoSensorsMeasurementModel sensor_right{0, 0.3, 0, -PI/2, 0.3, -PI/2, 4, 7.5};
+
+
+  TwoSensorsMeasurementModel sensor_first_quardrant_x_y{0, 28/100, PI/2, 27.3/100, 8, 15};
+  TwoSensorsMeasurementModel sensor_second_quardrant_y_min_x{PI/2, 27.3/100, PI, 28.5/100, 8, 15};
+  TwoSensorsMeasurementModel sensor_third_quardrant_min_x_min_y{PI, 28.5/100, -PI/2, 27/100, 8, 15};
+  TwoSensorsMeasurementModel sensor_fourth_quardrant_x_min_y{-PI/2, 27/100, 0, 28/100, 8, 15};
 
 
   Kalman::Covariance<ImuMeasurement> imu_cov;
   Kalman::Covariance<WheelMeasurement> wheel_cov;
   Kalman::Covariance<State> state_cov;
   // Kalman::Covariance<TFMiniMeasurement> tf_cov;
-  Kalman::Covariance<TwoSensorsMeasurement> cov_right;
-  Kalman::Covariance<TwoSensorsMeasurement> cov_left;
+  Kalman::Covariance<TwoSensorsMeasurement> cov_first_quard;
+  Kalman::Covariance<TwoSensorsMeasurement> cov_second_quard;
+  Kalman::Covariance<TwoSensorsMeasurement> cov_third_quard;
+  Kalman::Covariance<TwoSensorsMeasurement> cov_fourth_quard;
+
 
 
 
@@ -154,19 +160,18 @@ public:
     state.y() = 2.11;
 
   
+
     state_cov.setIdentity();
-    state_cov /= 100; // for now, must change later
+    state_cov /= 10;
 
-    state_cov(State::VX, State::VX) = 2;
-    state_cov(State::VY, State::VY) = 2;
-    state_cov(State::OMEGA, State::OMEGA) = 0.5;
-    state_cov(State::AX, State::AX) = 4;
-    state_cov(State::AY, State::AY) = 4;
-
-
-    // state_cov(State::VX, State::VX) = 1;
-    // state_cov(State::VY, State::VY) = 1;
-    // state_cov(State::OMEGA, State::OMEGA) = 1;
+    state_cov(State::X, State::X) = 0.01;
+    state_cov(State::Y, State::Y) = 0.01;
+    state_cov(State::VX, State::VX) = 0.3;
+    state_cov(State::VY, State::VY) = 0.3;
+    state_cov(State::OMEGA, State::OMEGA) = 0.3;
+    state_cov(State::THETA, State::THETA) = 2;
+    state_cov(State::AX, State::AX) = 1;
+    state_cov(State::AY, State::AY) = 1;
 
     wheel_cov(WheelMeasurement::OMEGA_L, WheelMeasurement::OMEGA_L) = 1;
     wheel_cov(WheelMeasurement::OMEGA_R, WheelMeasurement::OMEGA_R) = 1;
@@ -177,8 +182,8 @@ public:
     // tf_cov(TFMiniMeasurement::D2, TFMiniMeasurement::D2) = 0.1;
     // tf_cov(TFMiniMeasurement::D3, TFMiniMeasurement::D3) = 0.1;
 
-    cov_right.setIdentity();
-    cov_left.setIdentity();
+    // cov_right.setIdentity();
+    // cov_left.setIdentity();
 
 
     imu_cov(ImuMeasurement::AX, ImuMeasurement::AX) = 1;
@@ -187,7 +192,7 @@ public:
 
 
     imu_model.setCovariance(imu_cov);
-    wheel_model.setCovariance(wheel_cov);
+    //    wheel_model.setCovariance(wheel_cov);
     //mini.setCovariance(tf_cov);
     // Set Covariance Of State Model
     sys.setCovariance(state_cov);
@@ -205,19 +210,19 @@ public:
     x_ekf = ekf.predict(sys, twist, time);
   }
 
-  void wheel_update(OdomMsg msg, double time) {
-    WheelMeasurement wheel;
+  // void wheel_update(OdomMsg msg, double time) {
+  //   WheelMeasurement wheel;
 
-    double omega_r = omega_r_lpf.update(msg.omega_r);
-    double omega_l = omega_l_lpf.update(msg.omega_l);
-    double omega_m = omega_m_lpf.update(msg.omega_m);
+  //   double omega_r = omega_r_lpf.update(msg.omega_r);
+  //   double omega_l = omega_l_lpf.update(msg.omega_l);
+  //   double omega_m = omega_m_lpf.update(msg.omega_m);
     
-    wheel.omega_r() = omega_r;
-    wheel.omega_l() = omega_l;
-    wheel.omega_m() = omega_m;
+  //   wheel.omega_r() = omega_r;
+  //   wheel.omega_l() = omega_l;
+  //   wheel.omega_m() = omega_m;
     
-    x_ekf = ekf.update(wheel_model, wheel, time);
-  }
+  //   x_ekf = ekf.update(wheel_model, wheel, time);
+  // }
 
   void imu_update(ImuData msg, double time) {
     // We can measure the orientation every 5th step
@@ -245,60 +250,56 @@ public:
   }
 
   void distance_update(Sick msg, double time) {
-    // TFMiniMeasurement min;
-    // min.d1() = msg.d_mid/100;
-    // min.d3() = msg.d_left/100;
-    // min.d2() = msg.d_right/100;
-
-    // tf_cov(TFMiniMeasurement::D1, TFMiniMeasurement::D1) = get_cov(msg.s_mid);
-    // tf_cov(TFMiniMeasurement::D3, TFMiniMeasurement::D3) = get_cov(msg.s_left);
-    // tf_cov(TFMiniMeasurement::D2, TFMiniMeasurement::D2) = get_cov(msg.s_right);
     
-    // mini.setCovarianceSquareRoot(tf_cov);
-    
-    // x_ekf = ekf.update(mini, min, time);
+    TwoSensorsMeasurement first_quardrant;
+    TwoSensorsMeasurement second_quardrant;
+    TwoSensorsMeasurement third_quardrant;
+    TwoSensorsMeasurement fourth_quardrant;
 
-    
-    TwoSensorsMeasurement right;
-    TwoSensorsMeasurement left;
+    cov_first_quard(TwoSensorsMeasurement::D1, TwoSensorsMeasurement::D1) =
+        0.008;
+    cov_first_quard(TwoSensorsMeasurement::D2, TwoSensorsMeasurement::D2) =
+        0.008;
 
+    cov_second_quard(TwoSensorsMeasurement::D1, TwoSensorsMeasurement::D1) =
+        0.008;
+    cov_second_quard(TwoSensorsMeasurement::D2, TwoSensorsMeasurement::D2) =
+        0.008;
 
-    // min.d1() = dm[i]/100;
-    // min.d3() = dl[i]/100;
-    // min.d2() = dr[i]/100;
+    cov_third_quard(TwoSensorsMeasurement::D1, TwoSensorsMeasurement::D1) =
+        0.008;
+    cov_third_quard(TwoSensorsMeasurement::D2, TwoSensorsMeasurement::D2) =
+        0.008;
 
+    cov_fourth_quard(TwoSensorsMeasurement::D1, TwoSensorsMeasurement::D1) =
+        0.008;
+    cov_fourth_quard(TwoSensorsMeasurement::D2, TwoSensorsMeasurement::D2) =
+        0.008;
 
-    // all these things are not done properly
-    right.d1() = msg.d_one/100;
-    right.d2() = msg.d_two/100;
-      
-    left.d1() = msg.d_one/100;
-    left.d2() = msg.d_three/100;
-      
-      
+    // convert to meter from centimeter
+    first_quardrant.d1() = msg.d_one/100;
+    first_quardrant.d2() = msg.d_two/100;
 
+    second_quardrant.d1() = msg.d_two/100;
+    second_quardrant.d2() = msg.d_three/100;
 
-    cov_right(TwoSensorsMeasurement::D1, TwoSensorsMeasurement::D1) = 0.09;
-    cov_right(TwoSensorsMeasurement::D2, TwoSensorsMeasurement::D2) = 0.09;
+    third_quardrant.d1() = msg.d_three/100;
+    third_quardrant.d2() = msg.d_four/100;
 
-    cov_left(TwoSensorsMeasurement::D1, TwoSensorsMeasurement::D1) = 0.09;
-    cov_left(TwoSensorsMeasurement::D2, TwoSensorsMeasurement::D2) = 0.09;
+    fourth_quardrant.d1() = msg.d_four/100;
+    fourth_quardrant.d2() = msg.d_one/100;
 
-    sensor_right.setCovarianceSquareRoot(cov_right);
-    sensor_left.setCovarianceSquareRoot(cov_left);
+    if (msg.works_one && msg.works_two)
+      x_ekf = ekf.update(sensor_first_quardrant_x_y, first_quardrant, time);
 
+    if (msg.works_two && msg.works_three)
+      x_ekf = ekf.update(sensor_second_quardrant_y_min_x, second_quardrant, time);
 
-    // std::cout << "REAL d1 : " << min.d1() << std::endl
-    // 		<< "REAL d2 : " << min.d2() << std::endl
-    // 		<< "REAL d3 : " << min.d3() << std::endl;
+    if (msg.works_three && msg.works_four)
+      x_ekf = ekf.update(sensor_third_quardrant_min_x_min_y, third_quardrant, time);
 
-
-    //if (i % 300 == 0 || i < 250) 
-    // x_ekf = ekf.update(mini, min, time);
-
-    x_ekf = ekf.update(sensor_right, right, time, true, 0.8);
-    x_ekf = ekf.update(sensor_left, left, time, true, 1);
-
+    if (msg.works_four && msg.works_one)
+      x_ekf = ekf.update(sensor_fourth_quardrant_x_min_y, fourth_quardrant, time);
 
   }
 };

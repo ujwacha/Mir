@@ -23,10 +23,16 @@
 #include <iostream>
 #include <memory>
 
+#include <Eigen/Dense>
 #include "msgs.hpp"
 #include "KalmanFilter.hpp"
+#include "three_wheels_to_twist.hpp"
 
 #include "sick_interfaces/msg/sick.hpp"
+
+
+
+#define WHEEL_D 0.0574
 
 class Sayer : public rclcpp::Node {
 private:
@@ -51,19 +57,21 @@ private:
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher;
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
+  Controller controller_model{-8.9/100, -17.6/100, 0, 13.81/100, 0.61/100, PI/2, 7.3/100, 16.4/100, PI/2, WHEEL_D/2};
+
 
 public:
   Sayer(const rclcpp::NodeOptions &options) : Node("MirLocalize", options) {
     const rclcpp::QoS currentqol = rclcpp::QoS(10).best_effort().durability_volatile();
     RCLCPP_INFO(this->get_logger(), "Hi Mir, Kalman Filter");
 
-    cmd_vel_subscriber = this->create_subscription<geometry_msgs::msg::Twist>(
-      "cmd_vel",
-      currentqol,
-      std::bind(
-        &Sayer::cmd_vel_subscription_callback, this, std::placeholders::_1
-      )
-    );
+    // cmd_vel_subscriber = this->create_subscription<geometry_msgs::msg::Twist>(
+    //   "cmd_vel",
+    //   currentqol,
+    //   std::bind(
+    //     &Sayer::cmd_vel_subscription_callback, this, std::placeholders::_1
+    //   )
+    // );
 
 
     rpy_sub = this->create_subscription<geometry_msgs::msg::Vector3>(
@@ -108,7 +116,7 @@ public:
 
     timer =
         this->create_wall_timer(std::chrono::milliseconds(10),
-                                std::bind(&Sayer::update_kalman_data, this));
+                                std::bind(&Sayer::publish, this));
 
     odom_publisher =
         this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
@@ -118,58 +126,67 @@ public:
     // initial_time = time.n();
   }
 
-  void cmd_vel_subscription_callback(
-      const geometry_msgs::msg::Twist::SharedPtr msg) {
-    RCLCPP_INFO(this->get_logger(), "cmd_vel recieved");
-    twist_msg.x = msg->linear.x;
-    twist_msg.y = msg->linear.y;
-    twist_msg.z = msg->angular.z;
-  }
+  // void cmd_vel_subscription_callback(
+  //     const geometry_msgs::msg::Twist::SharedPtr msg) {
+  //   RCLCPP_INFO(this->get_logger(), "cmd_vel recieved");
+  //   twist_msg.x = msg->linear.x;
+  //   twist_msg.y = msg->linear.y;
+  //   twist_msg.z = msg->angular.z;
+  // }
 
   void rpy_callback(const geometry_msgs::msg::Vector3::SharedPtr msg) {
     RCLCPP_INFO(this->get_logger(), "roll, pitch, yaw recieved");
     imu_data.roll = msg->x;
     imu_data.pitch = msg->y;
     imu_data.yaw = msg->z;
-  }
 
-  void distance_callback(const geometry_msgs::msg::Vector3::SharedPtr msg) {
-    RCLCPP_INFO(this->get_logger(), "Distances Recieved");
-    dis_mrl.d_mid = msg->x;
-    dis_mrl.d_right = msg->y;
-    dis_mrl.d_left = msg->z;
-  }
-
-  void sick_subscription_callback(const sick_interfaces::msg::Sick::SharedPtr msg) {
-    RCLCPP_INFO(this->get_logger(), "Sick Distances Recieved");
-    si.d_one = msg->distance_one;
-    si.d_two = msg->distance_two;
-    si.d_three = msg->distance_three;
-    si.d_four = msg->distance_four;
-
-    Twist_msg msg_twist; // just for now, later better systems will be used
-    msg_twist.x = 0;
-    msg_twist.y = 0;
-    msg_twist.z = 0;
 
     double time = this->now().seconds() - prev_time;
-    Kalman.predict(msg_twist, time);
+    Kalman.predict(twist_msg, time);
+    Kalman.imu_update(imu_data, time);
+    prev_time = this->now().seconds();
+
+    RCLCPP_INFO(this->get_logger(), "Updated Kalman Filter [IMU]");
+  }
+
+  // void distance_callback(const geometry_msgs::msg::Vector3::SharedPtr msg) {
+  //   RCLCPP_INFO(this->get_logger(), "Distances Recieved");
+  //   dis_mrl.d_mid = msg->x;
+  //   dis_mrl.d_right = msg->y;
+  //   dis_mrl.d_left = msg->z;
+  // }
+
+  void
+  sick_subscription_callback(const sick_interfaces::msg::Sick::SharedPtr msg) {
+    RCLCPP_INFO(this->get_logger(), "Sick Distances Recieved");
+    si.d_one = msg->distance_one;
+    si.works_one = msg->works_one;
+
+    si.d_two = msg->distance_two;
+    si.works_two = msg->works_two;
+
+    si.d_three = msg->distance_three;
+    si.works_three = msg->works_three;
+
+    si.d_four = msg->distance_four;
+    si.works_four= msg->works_four;
+
+    double time = this->now().seconds() - prev_time;
+    Kalman.predict(twist_msg, time);
     Kalman.distance_update(si, time);
 
     prev_time = this->now().seconds();
 
     RCLCPP_INFO(this->get_logger(), "Updated Kalman Filter [SICK]");
-    publish();
   }
 
+  // void strength_callback(const geometry_msgs::msg::Vector3::SharedPtr msg) {
 
-  void strength_callback(const geometry_msgs::msg::Vector3::SharedPtr msg) {
-
-    RCLCPP_INFO(this->get_logger(), "Strengths REcieved");
-    dis_mrl.s_mid = msg->x;
-    dis_mrl.s_right = msg->y;
-    dis_mrl.s_left = msg->z;
-  }
+  //   RCLCPP_INFO(this->get_logger(), "Strengths REcieved");
+  //   dis_mrl.s_mid = msg->x;
+  //   dis_mrl.s_right = msg->y;
+  //   dis_mrl.s_left = msg->z;
+  // }
 
   void imu_subscription_callback(const sensor_msgs::msg::Imu::SharedPtr msg) {
     const auto &orientation = msg->orientation;
@@ -192,31 +209,15 @@ public:
   odom_subscription_callback(const geometry_msgs::msg::Vector3::SharedPtr msg) {
 
     RCLCPP_INFO(this->get_logger(), "Wheel Angular Velosities Recieved");
-    odom_msg.omega_l = msg->x;
-    odom_msg.omega_r = msg->y;
-    odom_msg.omega_m = msg->z;
-  }
+    // odom_msg.omega_l = msg->x;
+    // odom_msg.omega_r = msg->y;
+    // odom_msg.omega_m = msg->z;
 
-  void update_kalman_data() {
-
-    double time = this->now().seconds() - prev_time;
-
-    Twist_msg msg;
-    msg.x = 0;
-    msg.y = 0;
-    msg.z = 0;
-
-    Kalman.predict(msg, time);
-    Kalman.wheel_update(odom_msg, time);
-
-    Kalman.imu_update(imu_data, time);
-    // Kalman.distance_update(dis_mrl, time);
-
-    prev_time = this->now().seconds();
-
-    RCLCPP_INFO(this->get_logger(), "Updated Kalman Filter");
-
-    publish();
+    auto calculated = controller_model.get_output(msg->x, msg->y, msg->z);
+    twist_msg.x = calculated.vx;
+    twist_msg.y = calculated.vy;
+    twist_msg.z = calculated.w;
+    RCLCPP_INFO(this->get_logger(), "Calculated Twist");
   }
 
   void publish() {
@@ -264,13 +265,23 @@ public:
     double vy = Kalman.x_ekf[State::VY];
 
     // frame con
-    msg.twist.twist.linear.x = vx * std::cos(theta) + vy * std::sin(theta);
+    // msg.twist.twist.linear.x = vx * std::cos(theta) + vy * std::sin(theta);
 
-    msg.twist.twist.linear.y = -vx * std::sin(theta) + vy * std::cos(theta);
+    // msg.twist.twist.linear.y = -vx * std::sin(theta) + vy * std::cos(theta);
+    // msg.twist.twist.linear.z = 0.0;
+    // msg.twist.twist.angular.z = Kalman.x_ekf[State::OMEGA];
+
+    // since it is already relative, the frame conversion is unnecessary
+
+    msg.twist.twist.linear.x = vx;
+    msg.twist.twist.linear.y = vy;
     msg.twist.twist.linear.z = 0.0;
+
     msg.twist.twist.angular.z = Kalman.x_ekf[State::OMEGA];
 
+
     // Covariance matrices (set to zero for simplicity)
+    // send the covariance from kalman filter later to see ellipse in rviz
     for (size_t i = 0; i < 36; ++i) {
       msg.pose.covariance[i] = 0.0;
       msg.twist.covariance[i] = 0.0;
@@ -279,7 +290,7 @@ public:
     auto state_cov = Kalman.ekf.getCovariance();
 
     msg.pose.covariance[0] = state_cov(State::X, State::X);
-    msg.pose.covariance[1] = state_cov(State::Y, State::Y);
+    msg.pose.covariance[6] = state_cov(State::Y, State::Y);
     odom_publisher->publish(msg);
     RCLCPP_INFO(this->get_logger(), "Published odometry message");
   }

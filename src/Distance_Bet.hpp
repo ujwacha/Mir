@@ -4,7 +4,7 @@
 
 template <typename T> class RobotSensorKalman {
 private:
-  T l, b, r, a, ra;       // Environment and robot parameters
+  T l, b, r, a;       // Environment and robot parameters
   const T eps = 1e-6; // For numerical stability
 
   // Structure to hold both distance and derivatives
@@ -24,19 +24,12 @@ private:
   }
 
 public:
-  RobotSensorKalman(T angle_to_cir, T radius_to_cir, T angle, T length , T breadth)
-    : l(length), b(breadth), r(radius_to_cir), a(angle), ra(angle_to_cir) {}
+  RobotSensorKalman(T angle, T radius , T length , T breadth)
+    : l(length), b(breadth), r(radius), a(angle) {}
 
   SensorResult calculate(T x, T y, T theta_s) {
     SensorResult result;
     theta_s = normalizeAngle(theta_s + a);
-    T theta_b = normalizeAngle(theta_s + ra);
-
-    // from this we need to change the values of x and y
-    // to represent the place where x and y exist
-
-    x = x + r*std::cos(theta_b);
-    y = y + r*std::sin(theta_b);
 
     // print_res(result);
 
@@ -55,39 +48,32 @@ public:
 
     // Determine which edge we're facing
     if (-beta <= theta_s && theta_s <= alpha) { // Right edge
-      result.distance = (b - x) / std::cos(theta_s);
+      result.distance = (b - x) / std::cos(theta_s) - r;
       result.dx = -1.0 / std::cos(theta_s);
       result.dy = 0.0;
       result.dtheta = (b - x) * std::sin(theta_s) /
                       (std::cos(theta_s) * std::cos(theta_s) + eps);
-      result.dtheta += r*std::sin(theta_s - theta_b)/(std::cos(theta_s) * std::cos(theta_s) + eps);
-
     } else if (alpha <= theta_s && theta_s <= M_PI - gamma) { // Top edge
-      result.distance = (l - y) / std::sin(theta_s);
+      result.distance = (l - y) / std::sin(theta_s) - r;
       result.dx = 0.0;
       result.dy = -1.0 / std::sin(theta_s);
       result.dtheta = -(l - y) * std::cos(theta_s) /
                       (std::sin(theta_s) * std::sin(theta_s) + eps);
-
-      result.dtheta += r*std::sin(theta_s - theta_b)/(std::sin(theta_s) * std::sin(theta_s) + eps);
     } else if (-M_PI + theta <= theta_s && theta_s <= -beta) { // Bottom edge
-      result.distance = -y / std::sin(theta_s);
+      result.distance = -y / std::sin(theta_s) - r;
       result.dx = 0.0;
       result.dy = -1.0 / std::sin(theta_s);
       result.dtheta =
           y * std::cos(theta_s) / (std::sin(theta_s) * std::sin(theta_s) + eps);
-      result.dtheta += r*std::sin(theta_s - theta_b)/(std::sin(theta_s) * std::sin(theta_s) + eps);
     } else { // Left edge
-      result.distance = -x / std::cos(theta_s);
+      result.distance = -x / std::cos(theta_s) - r;
       result.dx = -1.0 / std::cos(theta_s);
       result.dy = 0.0;
       result.dtheta = -x * std::sin(theta_s) /
                       (std::cos(theta_s) * std::cos(theta_s) + eps);
-
-      result.dtheta += r*std::sin(theta_s - theta_b)/(std::cos(theta_s) * std::cos(theta_s) + eps);
     }
 
-    // print_res(result);
+    print_res(result);
 
     // Clamp negative distances and handle numerical instability
     if (result.distance < 0) {
