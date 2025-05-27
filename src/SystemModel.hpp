@@ -135,6 +135,10 @@ namespace Robot {
 
       x_.ay() = x.ay();
 
+      #ifdef INFO_DUMP
+      std::cout << "[INFO] [SYSTEM MODEL] t: " << t << std::endl;
+      #endif
+
       return x_;
     }
 
@@ -203,6 +207,10 @@ protected:
       this->F(S::X, S::AY) = -0.5*t*t*std::sin(theta);
       this->F(S::Y, S::AY) = 0.5*t*t*std::cos(theta);
       this->F(S::AY, S::AY) = 1;
+
+      #ifdef INFO_DUMP
+      std::cout << "[INFO] [SYSTEM MODEL JACOBIAN] t: " << t << std::endl;
+      #endif
 
 
       

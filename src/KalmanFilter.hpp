@@ -164,14 +164,14 @@ public:
     state_cov.setIdentity();
     state_cov /= 10;
 
-    state_cov(State::X, State::X) = 0.01;
-    state_cov(State::Y, State::Y) = 0.01;
+    state_cov(State::X, State::X) = 0.03;
+    state_cov(State::Y, State::Y) = 0.03;
     state_cov(State::VX, State::VX) = 0.3;
     state_cov(State::VY, State::VY) = 0.3;
     state_cov(State::OMEGA, State::OMEGA) = 0.3;
-    state_cov(State::THETA, State::THETA) = 2;
-    state_cov(State::AX, State::AX) = 1;
-    state_cov(State::AY, State::AY) = 1;
+    state_cov(State::THETA, State::THETA) = 1;
+    state_cov(State::AX, State::AX) = 3;
+    state_cov(State::AY, State::AY) = 3;
 
     wheel_cov(WheelMeasurement::OMEGA_L, WheelMeasurement::OMEGA_L) = 1;
     wheel_cov(WheelMeasurement::OMEGA_R, WheelMeasurement::OMEGA_R) = 1;
