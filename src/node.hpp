@@ -58,14 +58,6 @@ private:
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher;
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
-    // Create controller instance
-    Controller controller_model{
-        -8.9/100, -17.6/100, 0,          // Wheel 1 position and angle
-        13.81/100, 0.61/100, M_PI/2,      // Wheel 2 position and angle
-        7.3/100, 16.4/100, 0,        // Wheel 3 position and angle
-        WHEEL_D/2                         // Wheel radius
-    };
-
 
 
 public:
@@ -147,23 +139,24 @@ public:
 
   void
   sick_subscription_callback(const sick_interfaces::msg::Sick::SharedPtr msg) {
-    return;
+    //    return;
     double time = this->now().seconds() - prev_time;
     prev_time = this->now().seconds();
 
-    si.d_one = msg->distance_one;
+    si.d_one = msg->distance_one/100;
     si.works_one = msg->works_one;
 
-    si.d_two = msg->distance_two;
+    si.d_two = msg->distance_two/100;
     si.works_two = msg->works_two;
 
-    si.d_three = msg->distance_three;
+    si.d_three = msg->distance_three/100;
     si.works_three = msg->works_three;
 
-    si.d_four = msg->distance_four;
+    si.d_four = msg->distance_four/100;
     si.works_four= msg->works_four;
 
     Kalman.predict(twist_msg, time);
+    Kalman.imu_update(imu_data, time);
     Kalman.distance_update(si, time);
 
     RCLCPP_INFO(this->get_logger(), "Sick Distances Recieved");
@@ -192,19 +185,15 @@ public:
   odom_subscription_callback(const geometry_msgs::msg::Vector3::SharedPtr msg) {
 
     RCLCPP_INFO(this->get_logger(), "Wheel Angular Velosities Recieved");
-    // odom_msg.omega_l = msg->x;
-    // odom_msg.omega_r = msg->y;
-    // odom_msg.omega_m = msg->z;
 
-    auto calculated = controller_model.get_output(msg->x, msg->y, msg->z);
-    twist_msg.x = calculated.vx;
-    twist_msg.y = calculated.vy;
-    twist_msg.z = calculated.w;
+    twist_msg.x = msg->x;
+    twist_msg.y = msg->y;
+    twist_msg.z = msg->z;
 
 
-    std::cout << "VX: " << calculated.vx << std::endl;
-    std::cout << "VY: " << calculated.vy << std::endl;
-    std::cout << "W: " << calculated.w << std::endl;
+    std::cout << "VX: " << twist_msg.x << std::endl;
+    std::cout << "VY: " << twist_msg.y << std::endl;
+    std::cout << "W: " << twist_msg.z << std::endl;
 
     RCLCPP_INFO(this->get_logger(), "Calculated Twist");
   }

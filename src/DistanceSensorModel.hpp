@@ -4,42 +4,39 @@
 #include <ostream>
 
 #include "kalman/LinearizedMeasurementModel.hpp"
+//// /#include "Distance_Bet.hpp"
+
 
 #define PI 3.1415
 
 namespace Robot {
-  template <typename T> class TwoSensorsMeasurement: public Kalman::Vector<T, 2> {
+  template <typename T> class DistanceSensorMeasurement: public Kalman::Vector<T, 1> {
   public:
-    KALMAN_VECTOR(TwoSensorsMeasurement, T, 2)
+    KALMAN_VECTOR(DistanceSensorMeasurement, T, 1)
 
     static constexpr std::size_t D1 = 0;
-    static constexpr std::size_t D2 = 1;
-    static constexpr std::size_t D3 = 2;
 
     T d1() const { return (*this)[D1]; }
     T &d1() { return (*this)[D1]; }
 
-    T d2() const { return (*this)[D2]; }
-    T &d2() { return (*this)[D2]; }
   };
 
   template <typename T,
 	    template <class> class CovarianceBase = Kalman::StandardBase>
-  class TwoSensorsMeasurementModel
-    : public Kalman::LinearizedMeasurementModel<State<T>, TwoSensorsMeasurement<T>, CovarianceBase> {
+  class DistanceSensorMeasurementModel
+    : public Kalman::LinearizedMeasurementModel<State<T>, DistanceSensorMeasurement<T>, CovarianceBase> {
   public:
     //! State type shortcut definition
     typedef State<T> S;
     
     //! Measurement type shortcut definition
-    typedef TwoSensorsMeasurement<T> M;
+    typedef DistanceSensorMeasurement<T> M;
 
-    mutable RobotSensorKalman<T> d1, d2;
+    mutable RobotSensorKalman<T> d1;
 
  
-    TwoSensorsMeasurementModel(T angle1_, T r1_, T angle2_, T r2_, T l_, T b_):
-      d1(angle1_, r1_, l_, b_),
-      d2(angle2_, r2_, l_, b_)
+    DistanceSensorMeasurementModel(T angle1_, T r1_, T l_, T b_):
+      d1(angle1_, r1_, l_, b_)
     {
       this->H.setIdentity();
       this->V.setIdentity();
@@ -57,11 +54,9 @@ namespace Robot {
       
       std::cout 
 	<< "d1:" << d1.calculate(x.x(), x.y(), x.theta()).distance << std::endl
-	<< "d2:" << d2.calculate(x.x(), x.y(), x.theta()).distance << std::endl
 	<< std::endl;
 
       measurement.d1() = d1.calculate(x.x(), x.y(), x.theta()).distance;
-      measurement.d2() = d2.calculate(x.x(), x.y(), x.theta()).distance;
 
       // char c;
       // std::cin >> c;
@@ -79,24 +74,25 @@ namespace Robot {
       this->H(M::D1, S::Y) = d1.calculate(x.x(), x.y(), x.theta()).dy;
       this->H(M::D1, S::THETA) = d1.calculate(x.x(), x.y(), x.theta()).dtheta;
 
-      this->H(M::D2, S::X) = d2.calculate(x.x(), x.y(), x.theta()).dx;
-      this->H(M::D2, S::Y) = d2.calculate(x.x(), x.y(), x.theta()).dy;
-      this->H(M::D2, S::THETA) = d2.calculate(x.x(), x.y(), x.theta()).dtheta;
+      std::cout << "H: " << this->H(M::D1, S::THETA) << std::endl;
+
+      // if (fabs(x.vx()) < 0.15 && fabs(x.vy()) < 0.15 && fabs(x.omega()) > 0.8)
+      //   this->V(M::D1, M::D1) = 10;
+      // else
+      //   this->V(M::D1, M::D1) = 1;
 
 
-      double value = 2.1;
+      // angles you want to reject is given by
+      //cos (angle) = 1/value 
+
+      double value = 2;
       
       if ((fabs(this->H(M::D1, S::X)) + fabs(this->H(M::D1, S::Y))) > value)
-	this->V(M::D1, M::D1) = 600;
+	this->V(M::D1, M::D1) = 6000;
       else 
 	this->V(M::D1, M::D1) = 1;
 
-      if ((fabs(this->H(M::D2, S::X)) + fabs(this->H(M::D2, S::Y))) > value)
-	this->V(M::D2, M::D2) = 600;
-      else 
-	this->V(M::D2, M::D2) = 1;
-
-
+      // this->V(M::D1, M::D1) = 1 + this->H(M::D1, S::THETA) * 2;
 
     }
   

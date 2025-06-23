@@ -29,9 +29,9 @@ T angleClamp(T angle)
 
 namespace Robot {
   template <typename T>
-  class State : public Kalman::Vector<T, 8> {
+  class State : public Kalman::Vector<T, 9> {
   public:
-    KALMAN_VECTOR(State, T, 8)
+    KALMAN_VECTOR(State, T, 9)
 
     // some comment on the whole state
     // x y and theta are on global frame
@@ -50,6 +50,7 @@ namespace Robot {
     // Accelerations
     static constexpr size_t AX = 6;
     static constexpr size_t AY = 7;
+    static constexpr size_t YAW_BIAS = 8;
 
     T x() const { return (*this)[X]; }
     T y() const { return (*this)[Y]; }
@@ -59,6 +60,7 @@ namespace Robot {
     T omega() const { return (*this)[OMEGA]; }
     T ax() const { return (*this)[AX]; }
     T ay() const { return (*this)[AY]; }
+    T yaw_bias() const { return (*this)[YAW_BIAS]; }
 
     T& x() { return (*this)[X]; }
     T& y() { return (*this)[Y]; }
@@ -68,6 +70,7 @@ namespace Robot {
     T& omega() { return (*this)[OMEGA]; }
     T& ax() { return (*this)[AX]; }
     T& ay() { return (*this)[AY]; }
+    T& yaw_bias() { return (*this)[YAW_BIAS]; }
   };
 }
 
@@ -135,9 +138,14 @@ namespace Robot {
 
       x_.ay() = x.ay();
 
-      #ifdef INFO_DUMP
-      std::cout << "[INFO] [SYSTEM MODEL] t: " << t << std::endl;
-      #endif
+      x_.yaw_bias() = x.yaw_bias();
+
+
+      if (x_.x() < 0) x_.x() = 0;
+      if (x_.y() < 0) x_.y() = 0;
+
+      if (x_.x() > 15) x_.x() = 15;
+      if (x_.y() < 0) x_.y() = 8;
 
       return x_;
     }
@@ -208,14 +216,23 @@ protected:
       this->F(S::Y, S::AY) = 0.5*t*t*std::cos(theta);
       this->F(S::AY, S::AY) = 1;
 
-      #ifdef INFO_DUMP
-      std::cout << "[INFO] [SYSTEM MODEL JACOBIAN] t: " << t << std::endl;
-      #endif
+
+      this->F(S::YAW_BIAS, S::YAW_BIAS) = 1;
 
 
-      
       this->W.setIdentity();
 
+      if (fabs(sqrt(x.vx()*x.vx() + x.vy()*x.vy() + x.omega()*x.omega())) < 0.1) {
+	this->W(S::X , S::X) /= 5;
+	this->W(S::Y , S::Y) /= 5;
+      }
+
+
+      // if (fabs(sqrt(x.vx()*x.vx() + x.vy()*x.vy()) < 0.1)) {
+      // 	this->W(S::X , S::X) /= 10;
+      // 	this->W(S::Y , S::Y) /= 10;
+      // }
+      
       // literally the same thing lol
       // this->W.setZero();
       // this->W(S::VX, C::RVX) = 1;

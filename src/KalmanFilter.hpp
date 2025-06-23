@@ -14,8 +14,10 @@
 #include "kalman/ExtendedKalmanFilter.hpp"
 #include "kalman/Types.hpp"
 #include "ThreeWheel.hpp"
-//#include "TFMiniMeasurementModek.hpp"
+#include "TFMiniMeasurementModek.hpp"
 #include "TwoDistanceSensorsMeasurementModel.hpp"
+#include "FourDistanceSensorsModel.hpp"
+#include "DistanceSensorModel.hpp"
 
 
 
@@ -41,14 +43,34 @@ typedef Robot::SystemModel<T> SystemModel;
 typedef Robot::OdomMeasurement<T> OdomMeasurement;
 typedef Robot::ImuMeasurement<T> ImuMeasurement;
 typedef Robot::WheelMeasurement<T> WheelMeasurement;
-// typedef Robot::TFMiniMeasurement<T> TFMiniMeasurement;
+typedef Robot::TFMiniMeasurement<T> TFMiniMeasurement;
+typedef Robot::DistanceSensorMeasurement<T> DistanceSensorMeasurement;
 typedef Robot::TwoSensorsMeasurement<T> TwoSensorsMeasurement;
+typedef Robot::FourSensorsMeasurement<T> FourSensorsMeasurement;
+
 
 typedef Robot::OdomMeasurementModel<T> OdomMeasurementModel;
 typedef Robot::ImuMeasurementModel<T> ImuMeasurementModel;
 typedef Robot::WheelMeasurementModel<T> WheelMeasurementModel;
-// typedef Robot::TFMiniMeasurementModel<T> TFMiniMeasurementModel;
+typedef Robot::TFMiniMeasurementModel<T> TFMiniMeasurementModel;
+typedef Robot::DistanceSensorMeasurementModel<T> DistanceSensorMeasurementModel;
 typedef Robot::TwoSensorsMeasurementModel<T> TwoSensorsMeasurementModel;
+typedef Robot::FourDistanceSensorsMeasumementModel<T> FourDistanceSensorsMeasumementModel;
+
+// #define SENSOR_ONE_RADIUS 0.295
+// #define SENSOR_TWO_RADIUS 0.273
+// #define SENSOR_THREE_RADIUS 0.275
+// #define SENSOR_FOUR_RADIUS 0.265
+
+// #define SENSOR_ONE_ANGLE 0
+// #define SENSOR_TWO_ANGLE 3.141592 / 2
+// #define SENSOR_THREE_ANGLE 3.141592
+// #define SENSOR_FOUR_ANGLE -3.141592 / 2
+
+
+
+#include "DynamicDistanceModel.hpp"
+
 
 
 
@@ -97,33 +119,18 @@ private:
   SystemModel sys;
   ImuMeasurementModel imu_model;
 
-  // Encoder<float> enc1(-MID_RADIUS, 0, 3.14145/2, WHEEL_D/2);
-  // Encoder<float> enc2(0, LEFT_RADIUS, 0, WHEEL_D/2);
-  // Encoder<float> enc3(0, -RIGHT_RADIUS, 0, WHEEL_D/2);
 
-  // WheelMeasurementModel wheel_model{0, LEFT_RADIUS, 0, 0, -RIGHT_RADIUS, 0, -MID_RADIUS, 0 , PI/2 , WHEEL_D/2};
-
-  //  TFMiniMeasurementModel mini{0, 0.3, PI/2, 0.3, -PI/2, 0.3, 4, 7.5};
-  //TFMiniMeasurementModel mini(PI/2, 0.2, 0, 0.2, -PI/2, 0.2, 4, 7.5);
-  // TwoSensorsMeasurementModel sensor_left{0, 0.3, 0, PI/2, 0.3, PI/2, 4, 7.5};
-  // TwoSensorsMeasurementModel sensor_right{0, 0.3, 0, -PI/2, 0.3, -PI/2, 4, 7.5};
+  DistanceSensorMeasurementModel sensor_one{SENSOR_ONE_ANGLE, SENSOR_ONE_RADIUS, 8.0, 15.0};
+  DistanceSensorMeasurementModel sensor_two{SENSOR_TWO_ANGLE, SENSOR_TWO_RADIUS, 8, 15};
+  DistanceSensorMeasurementModel sensor_three{SENSOR_THREE_ANGLE, SENSOR_THREE_RADIUS, 8, 15};
+  DistanceSensorMeasurementModel sensor_four{SENSOR_FOUR_ANGLE, SENSOR_FOUR_RADIUS, 8, 15};
 
 
-  TwoSensorsMeasurementModel sensor_first_quardrant_x_y{0, 28/100, PI/2, 27.3/100, 8, 15};
-  TwoSensorsMeasurementModel sensor_second_quardrant_y_min_x{PI/2, 27.3/100, PI, 28.5/100, 8, 15};
-  TwoSensorsMeasurementModel sensor_third_quardrant_min_x_min_y{PI, 28.5/100, -PI/2, 27/100, 8, 15};
-  TwoSensorsMeasurementModel sensor_fourth_quardrant_x_min_y{-PI/2, 27/100, 0, 28/100, 8, 15};
 
 
   Kalman::Covariance<ImuMeasurement> imu_cov;
   Kalman::Covariance<WheelMeasurement> wheel_cov;
   Kalman::Covariance<State> state_cov;
-  // Kalman::Covariance<TFMiniMeasurement> tf_cov;
-  Kalman::Covariance<TwoSensorsMeasurement> cov_first_quard;
-  Kalman::Covariance<TwoSensorsMeasurement> cov_second_quard;
-  Kalman::Covariance<TwoSensorsMeasurement> cov_third_quard;
-  Kalman::Covariance<TwoSensorsMeasurement> cov_fourth_quard;
-
 
 
 
@@ -156,47 +163,41 @@ public:
   KalmanFilter() {
     state.setZero();
 
-    state.x() = 1.7;
-    state.y() = 2.11;
-
-  
+    state.x() = 1;
+    state.y() = 1; 
+    state.theta() = 0;
+    state.yaw_bias() = 0;
 
     state_cov.setIdentity();
     state_cov /= 10;
 
-    state_cov(State::X, State::X) = 0.03;
-    state_cov(State::Y, State::Y) = 0.03;
+    // state_cov(State::X, State::X) = 0.0005;
+    // state_cov(State::Y, State::Y) = 0.0005;
+
+    state_cov(State::X, State::X) = 0.0005;
+    state_cov(State::Y, State::Y) = 0.0005;
+
+    // state_cov(State::X, State::X) = 1;
+    // state_cov(State::Y, State::Y) = 1;
+
     state_cov(State::VX, State::VX) = 0.3;
     state_cov(State::VY, State::VY) = 0.3;
     state_cov(State::OMEGA, State::OMEGA) = 0.3;
-    state_cov(State::THETA, State::THETA) = 1;
-    state_cov(State::AX, State::AX) = 3;
-    state_cov(State::AY, State::AY) = 3;
-
-    wheel_cov(WheelMeasurement::OMEGA_L, WheelMeasurement::OMEGA_L) = 1;
-    wheel_cov(WheelMeasurement::OMEGA_R, WheelMeasurement::OMEGA_R) = 1;
-    wheel_cov(WheelMeasurement::OMEGA_M, WheelMeasurement::OMEGA_M) = 1;
-
-
-    // tf_cov(TFMiniMeasurement::D1, TFMiniMeasurement::D1) = 0.1;
-    // tf_cov(TFMiniMeasurement::D2, TFMiniMeasurement::D2) = 0.1;
-    // tf_cov(TFMiniMeasurement::D3, TFMiniMeasurement::D3) = 0.1;
-
-    // cov_right.setIdentity();
-    // cov_left.setIdentity();
-
+    state_cov(State::THETA, State::THETA) = 0.0005;
+    state_cov(State::AX, State::AX) = 1;
+    state_cov(State::AY, State::AY) = 1;
+    state_cov(State::YAW_BIAS, State::YAW_BIAS) = 1e-6;
 
     imu_cov(ImuMeasurement::AX, ImuMeasurement::AX) = 1;
     imu_cov(ImuMeasurement::AY, ImuMeasurement::AY) = 1;
-    imu_cov(ImuMeasurement::YAW, ImuMeasurement::YAW) = 0.001;
+    imu_cov(ImuMeasurement::YAW, ImuMeasurement::YAW) = 0.00001;
 
-
+    // set covariance of IMU
     imu_model.setCovariance(imu_cov);
-    //    wheel_model.setCovariance(wheel_cov);
-    //mini.setCovariance(tf_cov);
+
     // Set Covariance Of State Model
     sys.setCovariance(state_cov);
- 
+
     ekf.init(state);
   }
 
@@ -210,20 +211,6 @@ public:
     x_ekf = ekf.predict(sys, twist, time);
   }
 
-  // void wheel_update(OdomMsg msg, double time) {
-  //   WheelMeasurement wheel;
-
-  //   double omega_r = omega_r_lpf.update(msg.omega_r);
-  //   double omega_l = omega_l_lpf.update(msg.omega_l);
-  //   double omega_m = omega_m_lpf.update(msg.omega_m);
-    
-  //   wheel.omega_r() = omega_r;
-  //   wheel.omega_l() = omega_l;
-  //   wheel.omega_m() = omega_m;
-    
-  //   x_ekf = ekf.update(wheel_model, wheel, time);
-  // }
-
   void imu_update(ImuData msg, double time) {
     // We can measure the orientation every 5th step
     ImuMeasurement imu;
@@ -236,7 +223,6 @@ public:
     double ay = msg.accel_y;
     double az = msg.accel_z;
 
-      
     Eigen::Vector3d accel = {ax, ay, az};
 
     Eigen::Vector3d rot_accel = rotateVector(accel, roll, pitch);
@@ -250,56 +236,105 @@ public:
   }
 
   void distance_update(Sick msg, double time) {
-    
-    TwoSensorsMeasurement first_quardrant;
-    TwoSensorsMeasurement second_quardrant;
-    TwoSensorsMeasurement third_quardrant;
-    TwoSensorsMeasurement fourth_quardrant;
+    DistanceSensorMeasurement sensor_one_measurement;
+    DistanceSensorMeasurement sensor_two_measurement;
+    DistanceSensorMeasurement sensor_three_measurement;
+    DistanceSensorMeasurement sensor_four_measurement;
 
-    cov_first_quard(TwoSensorsMeasurement::D1, TwoSensorsMeasurement::D1) =
-        0.008;
-    cov_first_quard(TwoSensorsMeasurement::D2, TwoSensorsMeasurement::D2) =
-        0.008;
+    sensor_one_measurement.d1() = msg.d_one;
+    sensor_two_measurement.d1() = msg.d_two;
+    sensor_three_measurement.d1() = msg.d_three;
+    sensor_four_measurement.d1() = msg.d_four;
+    bool use_mahalanobis = true;
+    // if (count < 30)
+    // 	use_mahalanobis = false;
 
-    cov_second_quard(TwoSensorsMeasurement::D1, TwoSensorsMeasurement::D1) =
-        0.008;
-    cov_second_quard(TwoSensorsMeasurement::D2, TwoSensorsMeasurement::D2) =
-        0.008;
+    std::vector<double> distances;
+    unsigned int mask = 0;
+    const double single_radius = 1;
+    const double radius = 1.4 * single_radius;
+    const double divider = 200;
 
-    cov_third_quard(TwoSensorsMeasurement::D1, TwoSensorsMeasurement::D1) =
-        0.008;
-    cov_third_quard(TwoSensorsMeasurement::D2, TwoSensorsMeasurement::D2) =
-        0.008;
+    if (msg.works_one && (ekf.get_mahalanobis(sensor_one, sensor_one_measurement) <
+                   single_radius * single_radius)) {
+      distances.push_back(sensor_one_measurement.d1());
+      mask = mask | SENSOR_ONE;
+    }
 
-    cov_fourth_quard(TwoSensorsMeasurement::D1, TwoSensorsMeasurement::D1) =
-        0.008;
-    cov_fourth_quard(TwoSensorsMeasurement::D2, TwoSensorsMeasurement::D2) =
-        0.008;
+    if (msg.works_two && (ekf.get_mahalanobis(sensor_two, sensor_two_measurement) <
+                   single_radius * single_radius)) {
+      distances.push_back(sensor_two_measurement.d1());
+      mask = mask | SENSOR_TWO;
+    }
 
-    // convert to meter from centimeter
-    first_quardrant.d1() = msg.d_one/100;
-    first_quardrant.d2() = msg.d_two/100;
+    if (msg.works_three && (ekf.get_mahalanobis(sensor_three, sensor_three_measurement) <
+                   single_radius * single_radius)) {
+      distances.push_back(sensor_three_measurement.d1());
+      mask = mask | SENSOR_THREE;
+    }
 
-    second_quardrant.d1() = msg.d_two/100;
-    second_quardrant.d2() = msg.d_three/100;
+    if (msg.works_four && (ekf.get_mahalanobis(sensor_four, sensor_four_measurement) <
+                   single_radius * single_radius)) {
+      distances.push_back(sensor_four_measurement.d1());
+      mask = mask | SENSOR_FOUR;
+    }
+    std::cout << "working_distances:" << distances.size() << " mask: " << mask
+              << std::endl;
+    // std::cin >> aaa;
 
-    third_quardrant.d1() = msg.d_three/100;
-    third_quardrant.d2() = msg.d_four/100;
+    if (distances.size() == 1) {
 
-    fourth_quardrant.d1() = msg.d_four/100;
-    fourth_quardrant.d2() = msg.d_one/100;
+      DistanceSensorMeasurementModel current = get_sensor_one(mask);
+      DistanceSensorMeasurement current_measurement;
+      current_measurement.d1() = distances[0];
+      Kalman::Covariance<DistanceSensorMeasurement> current_one_cov;
+      current_one_cov.setIdentity();
+      current_one_cov /= divider;
+      current.setCovariance(current_one_cov);
+      x_ekf = ekf.update(current, current_measurement, time, use_mahalanobis,
+                         radius);
 
-    if (msg.works_one && msg.works_two)
-      x_ekf = ekf.update(sensor_first_quardrant_x_y, first_quardrant, time, true, 0.8);
+    } else if (distances.size() == 2) {
 
-    if (msg.works_two && msg.works_three)
-      x_ekf = ekf.update(sensor_second_quardrant_y_min_x, second_quardrant, time, true, 0.8);
+      TwoSensorsMeasurementModel current = get_sensor_two(mask);
+      TwoSensorsMeasurement current_measurement;
+      current_measurement.d1() = distances[0];
+      current_measurement.d2() = distances[1];
+      Kalman::Covariance<TwoSensorsMeasurement> current_one_cov;
+      current_one_cov.setIdentity();
+      current_one_cov /= divider;
+      current.setCovariance(current_one_cov);
+      x_ekf = ekf.update(current, current_measurement, time, use_mahalanobis,
+                         radius);
 
-    if (msg.works_three && msg.works_four)
-      x_ekf = ekf.update(sensor_third_quardrant_min_x_min_y, third_quardrant, time, true, 0.8);
+    } else if (distances.size() == 3) {
 
-    if (msg.works_four && msg.works_one)
-      x_ekf = ekf.update(sensor_fourth_quardrant_x_min_y, fourth_quardrant, time, true, 0.8);
+      TFMiniMeasurementModel current = get_sensor_three(mask);
+      TFMiniMeasurement current_measurement;
+      current_measurement.d1() = distances[0];
+      current_measurement.d2() = distances[1];
+      current_measurement.d3() = distances[2];
+      Kalman::Covariance<TFMiniMeasurement> current_one_cov;
+      current_one_cov.setIdentity();
+      current_one_cov /= divider;
+      current.setCovariance(current_one_cov);
+      x_ekf = ekf.update(current, current_measurement, time, use_mahalanobis,
+                         radius);
 
+    } else if (distances.size() == 4) {
+
+      FourDistanceSensorsMeasumementModel current = get_sensor_four();
+      FourSensorsMeasurement current_measurement;
+      current_measurement.d1() = distances[0];
+      current_measurement.d2() = distances[1];
+      current_measurement.d3() = distances[2];
+      current_measurement.d4() = distances[3];
+      Kalman::Covariance<FourSensorsMeasurement> current_one_cov;
+      current_one_cov.setIdentity();
+      current_one_cov /= divider;
+      current.setCovariance(current_one_cov);
+      x_ekf = ekf.update(current, current_measurement, time, use_mahalanobis,
+                         radius);
+    }
   }
 };
