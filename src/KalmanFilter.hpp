@@ -57,18 +57,6 @@ typedef Robot::DistanceSensorMeasurementModel<T> DistanceSensorMeasurementModel;
 typedef Robot::TwoSensorsMeasurementModel<T> TwoSensorsMeasurementModel;
 typedef Robot::FourDistanceSensorsMeasumementModel<T> FourDistanceSensorsMeasumementModel;
 
-// #define SENSOR_ONE_RADIUS 0.295
-// #define SENSOR_TWO_RADIUS 0.273
-// #define SENSOR_THREE_RADIUS 0.275
-// #define SENSOR_FOUR_RADIUS 0.265
-
-// #define SENSOR_ONE_ANGLE 0
-// #define SENSOR_TWO_ANGLE 3.141592 / 2
-// #define SENSOR_THREE_ANGLE 3.141592
-// #define SENSOR_FOUR_ANGLE -3.141592 / 2
-
-
-
 #include "DynamicDistanceModel.hpp"
 
 
@@ -120,10 +108,11 @@ private:
   ImuMeasurementModel imu_model;
 
 
-  DistanceSensorMeasurementModel sensor_one{SENSOR_ONE_ANGLE, SENSOR_ONE_RADIUS, 8.0, 15.0};
-  DistanceSensorMeasurementModel sensor_two{SENSOR_TWO_ANGLE, SENSOR_TWO_RADIUS, 8, 15};
-  DistanceSensorMeasurementModel sensor_three{SENSOR_THREE_ANGLE, SENSOR_THREE_RADIUS, 8, 15};
-  DistanceSensorMeasurementModel sensor_four{SENSOR_FOUR_ANGLE, SENSOR_FOUR_RADIUS, 8, 15};
+
+  DistanceSensorMeasurementModel sensor_one{SENSOR_ONE_ANGLE, SENSOR_ONE_RADIUS, SENSOR_ONE_BEAM_ANGLE, 8, 15};
+  DistanceSensorMeasurementModel sensor_two{SENSOR_TWO_ANGLE, SENSOR_TWO_RADIUS, SENSOR_TWO_BEAM_ANGLE, 8, 15};
+  DistanceSensorMeasurementModel sensor_three{SENSOR_THREE_ANGLE, SENSOR_THREE_RADIUS, SENSOR_THREE_BEAM_ANGLE,  8, 15};
+  DistanceSensorMeasurementModel sensor_four{SENSOR_FOUR_ANGLE, SENSOR_FOUR_RADIUS, SENSOR_FOUR_BEAM_ANGLE, 8, 15};
 
 
 
@@ -138,6 +127,8 @@ private:
   // Set Up 1st order and 2nd order low pass filters
   // As and Bs are calculated from GNU octave
   // Use GNU octave signal package and butter function
+
+  // currently, we already get filtered data 
   double omega_bs[2] = {0.086364, 0.086364};
   double omega_as[2] = {1.0000, -0.8273};
   filter<1> omega_l_lpf{omega_bs, omega_as};
@@ -163,8 +154,8 @@ public:
   KalmanFilter() {
     state.setZero();
 
-    state.x() = 1;
-    state.y() = 1; 
+    state.x() = 4;
+    state.y() = 4; 
     state.theta() = 0;
     state.yaw_bias() = 0;
 

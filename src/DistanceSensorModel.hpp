@@ -35,8 +35,8 @@ namespace Robot {
     mutable RobotSensorKalman<T> d1;
 
  
-    DistanceSensorMeasurementModel(T angle1_, T r1_, T l_, T b_):
-      d1(angle1_, r1_, l_, b_)
+    DistanceSensorMeasurementModel(T angle1_, T r1_, T angle_b1, T l_, T b_):
+      d1(angle1_, r1_, angle_b1, l_, b_)
     {
       this->H.setIdentity();
       this->V.setIdentity();
@@ -52,9 +52,9 @@ namespace Robot {
       // 		<< "y: " << x.y() << std::endl
       // 		<< "th: " << x.theta() << std::endl << std::endl;
       
-      std::cout 
-	<< "d1:" << d1.calculate(x.x(), x.y(), x.theta()).distance << std::endl
-	<< std::endl;
+      // std::cout 
+      // 	<< "d1:" << d1.calculate(x.x(), x.y(), x.theta()).distance << std::endl
+      // 	<< std::endl;
 
       measurement.d1() = d1.calculate(x.x(), x.y(), x.theta()).distance;
 
@@ -74,7 +74,7 @@ namespace Robot {
       this->H(M::D1, S::Y) = d1.calculate(x.x(), x.y(), x.theta()).dy;
       this->H(M::D1, S::THETA) = d1.calculate(x.x(), x.y(), x.theta()).dtheta;
 
-      std::cout << "H: " << this->H(M::D1, S::THETA) << std::endl;
+      // std::cout << "H: " << this->H(M::D1, S::THETA) << std::endl;
 
       // if (fabs(x.vx()) < 0.15 && fabs(x.vy()) < 0.15 && fabs(x.omega()) > 0.8)
       //   this->V(M::D1, M::D1) = 10;
@@ -85,10 +85,10 @@ namespace Robot {
       // angles you want to reject is given by
       //cos (angle) = 1/value 
 
-      double value = 2;
+      double value = 3;
       
       if ((fabs(this->H(M::D1, S::X)) + fabs(this->H(M::D1, S::Y))) > value)
-	this->V(M::D1, M::D1) = 6000;
+	this->V(M::D1, M::D1) = 600;
       else 
 	this->V(M::D1, M::D1) = 1;
 

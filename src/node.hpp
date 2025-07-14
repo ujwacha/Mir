@@ -28,7 +28,7 @@
 #include "KalmanFilter.hpp"
 #include "three_wheels_to_twist.hpp"
 
-#include "sick_interfaces/msg/sick.hpp"
+#include "sick_interfaces/msg/all_sensors.hpp"
 
 
 
@@ -36,27 +36,24 @@
 
 class Sayer : public rclcpp::Node {
 private:
-  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_subscriber;
-  rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_subscriber;
-  rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr odom_subscriber;
-  rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr rpy_sub;
-  rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr distance_sub;
-  rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr strength_sub;
-  rclcpp::Subscription<sick_interfaces::msg::Sick>::SharedPtr sick_sub;
+  rclcpp::Subscription<sick_interfaces::msg::AllSensors>::SharedPtr sensors_sub;
   rclcpp::TimerBase::SharedPtr timer;
   rclcpp::TimerBase::SharedPtr timer_predict;
   rclcpp::Time time;
   double prev_time;
 
-  Twist_msg twist_msg;
-  ImuData imu_data;
-  OdomMsg odom_msg;
-  Distance_Sensors dis_mrl;
-  Sick si;
-  
+ 
   KalmanFilter Kalman;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher;
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+
+  // Create controller instance
+  Controller controller_model{
+      -8.9/100,  -17.6/100, 0,        // Wheel 1 position and angle
+      13.81/100, 0.61/100,  M_PI / 2, // Wheel 2 position and angle
+      7.3/100,   16.4/100,  0,        // Wheel 3 position and angle
+      WHEEL_D / 2                         // Wheel radius
+  };
 
 
 
@@ -65,138 +62,85 @@ public:
     const rclcpp::QoS currentqol = rclcpp::QoS(10).best_effort().durability_volatile();
     RCLCPP_INFO(this->get_logger(), "Hi Mir, Kalman Filter");
 
-    // cmd_vel_subscriber = this->create_subscription<geometry_msgs::msg::Twist>(
-    //   "cmd_vel",
-    //   currentqol,
-    //   std::bind(
-    //     &Sayer::cmd_vel_subscription_callback, this, std::placeholders::_1
-    //   )
-    // );
 
 
-    rpy_sub = this->create_subscription<geometry_msgs::msg::Vector3>(
-      "imu/rpy",
-      currentqol,
-      std::bind(
-        &Sayer::rpy_callback, this, std::placeholders::_1
-      )
-    );
-
-
-    sick_sub = this->create_subscription<sick_interfaces::msg::Sick>(
-        "sick/data", currentqol,
-        std::bind(&Sayer::sick_subscription_callback, this,
-                  std::placeholders::_1));
-
-    imu_subscriber = this->create_subscription<sensor_msgs::msg::Imu>(
-        "imu/data_raw", currentqol,
-        std::bind(&Sayer::imu_subscription_callback, this,
-                  std::placeholders::_1));
-
-    odom_subscriber = this->create_subscription<geometry_msgs::msg::Vector3>(
-        "odom_vec", currentqol,
-        std::bind(&Sayer::odom_subscription_callback, this,
+    sensors_sub = this->create_subscription<sick_interfaces::msg::AllSensors>(
+        "sensors", currentqol,
+        std::bind(&Sayer::sensors_subscription_callback, this,
                   std::placeholders::_1));
 
     timer =
         this->create_wall_timer(std::chrono::milliseconds(10),
                                 std::bind(&Sayer::publish, this));
 
-    // timer_predict = 
-    //     this->create_wall_timer(std::chrono::milliseconds(10),
-    //                             std::bind(&Sayer::predict, this));
-
     odom_publisher =
         this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
     tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
-    prev_time = this->now().seconds();
+    prev_time = 0;
     // initial_time = time.n();
   }
 
-  void rpy_callback(const geometry_msgs::msg::Vector3::SharedPtr msg) {
-    double time = this->now().seconds() - prev_time;
-    prev_time = this->now().seconds();
 
-    RCLCPP_INFO(this->get_logger(), "roll, pitch, yaw recieved");
-    imu_data.roll = msg->x;
-    imu_data.pitch = msg->y;
-    imu_data.yaw = msg->z;
+  void sensors_subscription_callback(const sick_interfaces::msg::AllSensors msg) {
+    if (msg->timestamp_seconds < prev_time) return;
+
+    RCLCPP_INFO(this->get_logger(), "Sensor Msg Recieved");
+
+    double time_difference = msg->timestamp_seconds - prev_time;
+    prev_time = msg->timestamp_seconds;
 
 
-    Kalman.predict(twist_msg, time);
-    Kalman.imu_update(imu_data, time);
+    auto tw = controller_model.get_output(msg->omegas.x,
+					  msg->omegas.y,
+					  msg->omegas.z);
+    
+    Twist_msg twist_msg;
 
-    RCLCPP_INFO(this->get_logger(), "Updated Kalman Filter [IMU]");
-  }
-
-  void predict() {
-    // double time = this->now().seconds() - prev_time;
-    // prev_time = this->now().seconds();
-   
-    // Kalman.predict(twist_msg, time);
-  }
-
-  void
-  sick_subscription_callback(const sick_interfaces::msg::Sick::SharedPtr msg) {
-    //    return;
-    double time = this->now().seconds() - prev_time;
-    prev_time = this->now().seconds();
-
-    si.d_one = msg->distance_one/100;
-    si.works_one = msg->works_one;
-
-    si.d_two = msg->distance_two/100;
-    si.works_two = msg->works_two;
-
-    si.d_three = msg->distance_three/100;
-    si.works_three = msg->works_three;
-
-    si.d_four = msg->distance_four/100;
-    si.works_four= msg->works_four;
+    twist.x = tw.vx;
+    twist.y = tw.vx;
+    twist.z = tw.vx;
 
     Kalman.predict(twist_msg, time);
+    RCLCPP_INFO(this->get_logger(), "Predicted");
+
+    ImuData imu_data;
+
+    imu_data.roll = msg->imu_euler.x;
+    imu_data.pitch = msg->imu_euler.y;
+    imu_data.yaw = msg->imu_euler.z;
+    
+    imu_data.accel_x = msg->imu_accel.x;
+    imu_data.accel_y = msg->imu_accel.y;
+    imu_data.accel_z = msg->imu_accel.z;
+    
     Kalman.imu_update(imu_data, time);
-    Kalman.distance_update(si, time);
+    RCLCPP_INFO(this->get_logger(), "Updated IMU");
 
-    RCLCPP_INFO(this->get_logger(), "Sick Distances Recieved");
+    if (!msg->is_sick_latest) return;
 
-    RCLCPP_INFO(this->get_logger(), "Updated Kalman Filter [SICK]");
+    Sick sick;
+
+
+    sick.d_one = msg->sick_data.distance_one/100;
+    sick.works_one = msg->sick_data.works_one;
+
+    sick.d_two = msg->sick_data.distance_two/100;
+    sick.works_two = msg->sick_data.works_two;
+
+    sick.d_three = msg->sick_data.distance_three/100;
+    sick.works_three = msg->sick_data.works_three;
+
+    sick.d_four = msg->sick_data.distance_four/100;
+    sick.works_four= msg->sick_data.works_four;
+
+
+    
+    Kalman.distance_update(sick, time);
+
+    RCLCPP_INFO(this->get_logger(), "Updated SICK");
   }
 
-  void imu_subscription_callback(const sensor_msgs::msg::Imu::SharedPtr msg) {
-    const auto &orientation = msg->orientation;
-
-    tf2::Quaternion quat(orientation.x, orientation.y, orientation.z,
-                         orientation.w);
-
-    //    tf2::Matrix3x3(quat).getRPY(imu_data.roll, imu_data.pitch,
-    //    imu_data.yaw);
-
-    const auto &acceleration = msg->linear_acceleration;
-    imu_data.accel_x = acceleration.x;
-    imu_data.accel_y = acceleration.y;
-    imu_data.accel_z = acceleration.z;
-
-    RCLCPP_INFO(this->get_logger(), "Accelerations Kalman Filter");
-  }
-
-  void
-  odom_subscription_callback(const geometry_msgs::msg::Vector3::SharedPtr msg) {
-
-    RCLCPP_INFO(this->get_logger(), "Wheel Angular Velosities Recieved");
-
-    twist_msg.x = msg->x;
-    twist_msg.y = msg->y;
-    twist_msg.z = msg->z;
-
-
-    std::cout << "VX: " << twist_msg.x << std::endl;
-    std::cout << "VY: " << twist_msg.y << std::endl;
-    std::cout << "W: " << twist_msg.z << std::endl;
-
-    RCLCPP_INFO(this->get_logger(), "Calculated Twist");
-  }
 
   void publish() {
     // Calculate elapsed time

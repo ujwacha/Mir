@@ -4,7 +4,7 @@
 
 template <typename T> class RobotSensorKalman {
 private:
-  T l, b, r, a;       // Environment and robot parameters
+  T l, b, r, sensor_angle, beam_angle;       // Environment and robot parameters
   const T eps = 1e-6; // For numerical stability
 
   // Structure to hold both distance and derivatives
@@ -24,12 +24,20 @@ private:
   }
 
 public:
-  RobotSensorKalman(T angle, T radius , T length , T breadth)
-    : l(length), b(breadth), r(radius), a(angle) {}
+  RobotSensorKalman(T angle_to_cir, T radius_to_cir, T angle_bea, T length , T breadth)
+    : l(length), b(breadth), r(radius_to_cir), sensor_angle(angle_to_cir), beam_angle(angle_bea) {}
 
-  SensorResult calculate(T x, T y, T theta_s) {
+  SensorResult calculate(T x, T y, T theta_yaw) {
     SensorResult result;
-    theta_s = normalizeAngle(theta_s + a);
+
+    T theta_beam = normalizeAngle(theta_yaw + beam_angle);
+    T theta_sensor = normalizeAngle(theta_yaw + sensor_angle);
+
+    // from this we need to change the values of x and y
+    // to represent the place where x and y exist
+
+    T x_sensor = x + r*std::cos(theta_sensor);
+    T y_sensor = y + r*std::sin(theta_sensor);
 
     // print_res(result);
 
@@ -39,38 +47,42 @@ public:
     // std::cout << "DISTANCE{x: " << x << ", y: " << y << ", theta_s: " << theta_s << " } : " <<  std::endl;
 
     //Calculate angles to boundaries
-    const T theta = std::atan2(y, x);
-    const T beta = std::atan2(y, b - x);
-    const T alpha = std::atan2(l - y, b - x);
-    const T gamma = std::atan2(l - y, x);
+    const T theta = std::atan2(y_sensor, x_sensor);
+    const T beta = std::atan2(y_sensor, b - x_sensor);
+    const T alpha = std::atan2(l - y_sensor, b - x_sensor);
+    const T gamma = std::atan2(l - y_sensor, x_sensor);
 
 
 
     // Determine which edge we're facing
-    if (-beta <= theta_s && theta_s <= alpha) { // Right edge
-      result.distance = (b - x) / (std::cos(theta_s) + eps) - r;
-      result.dx = -1.0 / (std::cos(theta_s) + eps);
+    if (-beta <= theta_beam && theta_beam <= alpha) { // Right edge
+
+      result.distance = (b - x_sensor) / std::cos(theta_beam);
+      result.dx = -1.0 / std::cos(theta_beam);
       result.dy = 0.0;
-      result.dtheta = (b - x) * std::sin(theta_s) /
-                      (std::cos(theta_s) * std::cos(theta_s) + eps);
-    } else if (alpha <= theta_s && theta_s <= M_PI - gamma) { // Top edge
-      result.distance = (l - y) / (std::sin(theta_s) + eps) - r;
+      result.dtheta = (1/std::cos(theta_beam))*(std::tan(theta_beam)*(b - x_sensor) + r*std::sin(theta_sensor));
+      
+    } else if (alpha <= theta_beam && theta_beam <= M_PI - gamma) { // Top edge
+
+      result.distance = (l - y_sensor) / std::sin(theta_beam);
       result.dx = 0.0;
-      result.dy = -1.0 / (std::sin(theta_s) + eps);
-      result.dtheta = -(l - y) * std::cos(theta_s) /
-                      (std::sin(theta_s) * std::sin(theta_s) + eps);
-    } else if (-M_PI + theta <= theta_s && theta_s <= -beta) { // Bottom edge
-      result.distance = -y / (std::sin(theta_s) + eps) - r;
+      result.dy = -1.0 / std::sin(theta_beam);
+      result.dtheta = (1/std::sin(theta_beam))*((1/std::tan(theta_beam))*(-l + y_sensor) - r*std::cos(theta_sensor));
+
+    } else if (-M_PI + theta <= theta_beam && theta_beam <= -beta) { // Bottom edge
+
+      result.distance = -y_sensor / std::sin(theta_beam);
       result.dx = 0.0;
-      result.dy = -1.0 / (std::sin(theta_s) + eps);
-      result.dtheta =
-          y * std::cos(theta_s) / (std::sin(theta_s) * std::sin(theta_s) + eps);
+      result.dy = -1.0 / std::sin(theta_beam);
+      result.dtheta = -(1/std::sin(theta_beam))*(r*std::cos(theta_sensor) - (1/std::tan(theta_beam))*(y_sensor));
+
     } else { // Left edge
-      result.distance = -x / (std::cos(theta_s) + eps) - r;
-      result.dx = -1.0 / (std::cos(theta_s) + eps);
+
+      result.distance = -x_sensor / std::cos(theta_beam);
+      result.dx = -1.0 / std::cos(theta_beam);
       result.dy = 0.0;
-      result.dtheta = -x * std::sin(theta_s) /
-                      (std::cos(theta_s) * std::cos(theta_s) + eps);
+      result.dtheta = (1/std::cos(theta_beam))*(r*std::sin(theta_sensor) - std::tan(theta_beam)*(x_sensor));
+
     }
 
     // print_res(result);
