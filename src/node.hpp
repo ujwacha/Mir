@@ -39,7 +39,6 @@ private:
   rclcpp::Subscription<sick_interfaces::msg::AllSensors>::SharedPtr sensors_sub;
   rclcpp::TimerBase::SharedPtr timer;
   rclcpp::TimerBase::SharedPtr timer_predict;
-  rclcpp::Time time;
   double prev_time;
 
  
@@ -83,60 +82,60 @@ public:
 
 
   void sensors_subscription_callback(const sick_interfaces::msg::AllSensors msg) {
-    if (msg->timestamp_seconds < prev_time) return;
+    if (msg.timestamp_seconds < prev_time) return;
 
     RCLCPP_INFO(this->get_logger(), "Sensor Msg Recieved");
 
-    double time_difference = msg->timestamp_seconds - prev_time;
-    prev_time = msg->timestamp_seconds;
+    double time_difference = msg.timestamp_seconds - prev_time;
+    prev_time = msg.timestamp_seconds;
 
 
-    auto tw = controller_model.get_output(msg->omegas.x,
-					  msg->omegas.y,
-					  msg->omegas.z);
+    auto tw = controller_model.get_output(msg.omegas.x,
+					  msg.omegas.y,
+					  msg.omegas.z);
     
     Twist_msg twist_msg;
 
-    twist.x = tw.vx;
-    twist.y = tw.vx;
-    twist.z = tw.vx;
+    twist_msg.x = tw.vx;
+    twist_msg.y = tw.vx;
+    twist_msg.z = tw.vx;
 
-    Kalman.predict(twist_msg, time);
+    Kalman.predict(twist_msg, time_difference);
     RCLCPP_INFO(this->get_logger(), "Predicted");
 
     ImuData imu_data;
 
-    imu_data.roll = msg->imu_euler.x;
-    imu_data.pitch = msg->imu_euler.y;
-    imu_data.yaw = msg->imu_euler.z;
+    imu_data.roll = msg.imu_euler.x;
+    imu_data.pitch = msg.imu_euler.y;
+    imu_data.yaw = msg.imu_euler.z;
     
-    imu_data.accel_x = msg->imu_accel.x;
-    imu_data.accel_y = msg->imu_accel.y;
-    imu_data.accel_z = msg->imu_accel.z;
+    imu_data.accel_x = msg.imu_accel.x;
+    imu_data.accel_y = msg.imu_accel.y;
+    imu_data.accel_z = msg.imu_accel.z;
     
-    Kalman.imu_update(imu_data, time);
+    Kalman.imu_update(imu_data, time_difference);
     RCLCPP_INFO(this->get_logger(), "Updated IMU");
 
-    if (!msg->is_sick_latest) return;
+    if (!msg.is_sick_latest) return;
 
     Sick sick;
 
 
-    sick.d_one = msg->sick_data.distance_one/100;
-    sick.works_one = msg->sick_data.works_one;
+    sick.d_one = msg.sick_data.distance_one/100;
+    sick.works_one = msg.sick_data.works_one;
 
-    sick.d_two = msg->sick_data.distance_two/100;
-    sick.works_two = msg->sick_data.works_two;
+    sick.d_two = msg.sick_data.distance_two/100;
+    sick.works_two = msg.sick_data.works_two;
 
-    sick.d_three = msg->sick_data.distance_three/100;
-    sick.works_three = msg->sick_data.works_three;
+    sick.d_three = msg.sick_data.distance_three/100;
+    sick.works_three = msg.sick_data.works_three;
 
-    sick.d_four = msg->sick_data.distance_four/100;
-    sick.works_four= msg->sick_data.works_four;
+    sick.d_four = msg.sick_data.distance_four/100;
+    sick.works_four= msg.sick_data.works_four;
 
 
     
-    Kalman.distance_update(sick, time);
+    Kalman.distance_update(sick, time_difference);
 
     RCLCPP_INFO(this->get_logger(), "Updated SICK");
   }
