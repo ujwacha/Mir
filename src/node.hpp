@@ -185,15 +185,6 @@ public:
     double vx = Kalman.x_ekf[State::VX];
     double vy = Kalman.x_ekf[State::VY];
 
-    // frame con
-    // msg.twist.twist.linear.x = vx * std::cos(theta) + vy * std::sin(theta);
-
-    // msg.twist.twist.linear.y = -vx * std::sin(theta) + vy * std::cos(theta);
-    // msg.twist.twist.linear.z = 0.0;
-    // msg.twist.twist.angular.z = Kalman.x_ekf[State::OMEGA];
-
-    // since it is already relative, the frame conversion is unnecessary
-
     msg.twist.twist.linear.x = vx;
     msg.twist.twist.linear.y = vy;
     msg.twist.twist.linear.z = 0.0;
