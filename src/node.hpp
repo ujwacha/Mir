@@ -143,17 +143,32 @@ public:
     double time = this->now().seconds() - prev_time;
     prev_time = this->now().seconds();
 
-    si.d_one = msg->distance_one/100;
+    // si.d_one = msg->distance_one/100;
+    // si.works_one = msg->works_one;
+
+    // si.d_two = msg->distance_two/100;
+    // si.works_two = msg->works_two;
+
+    // si.d_three = msg->distance_three/100;
+    // si.works_three = msg->works_three;
+
+    // si.d_four = msg->distance_four/100;
+    // si.works_four= msg->works_four;
+
+    si.d_one = msg->distance_one;
     si.works_one = msg->works_one;
 
-    si.d_two = msg->distance_two/100;
+    si.d_two = msg->distance_two;
     si.works_two = msg->works_two;
 
-    si.d_three = msg->distance_three/100;
+    si.d_three = msg->distance_three;
     si.works_three = msg->works_three;
 
-    si.d_four = msg->distance_four/100;
+    si.d_four = msg->distance_four;
     si.works_four= msg->works_four;
+
+
+
 
     Kalman.predict(twist_msg, time);
     Kalman.imu_update(imu_data, time);

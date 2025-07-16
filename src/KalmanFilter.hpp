@@ -120,10 +120,17 @@ private:
   ImuMeasurementModel imu_model;
 
 
-  DistanceSensorMeasurementModel sensor_one{SENSOR_ONE_ANGLE, SENSOR_ONE_RADIUS, 8.0, 15.0};
-  DistanceSensorMeasurementModel sensor_two{SENSOR_TWO_ANGLE, SENSOR_TWO_RADIUS, 8, 15};
-  DistanceSensorMeasurementModel sensor_three{SENSOR_THREE_ANGLE, SENSOR_THREE_RADIUS, 8, 15};
-  DistanceSensorMeasurementModel sensor_four{SENSOR_FOUR_ANGLE, SENSOR_FOUR_RADIUS, 8, 15};
+  // DistanceSensorMeasurementModel sensor_one{SENSOR_ONE_ANGLE, SENSOR_ONE_RADIUS, 8.0, 15.0};
+  // DistanceSensorMeasurementModel sensor_two{SENSOR_TWO_ANGLE, SENSOR_TWO_RADIUS, 8, 15};
+  // DistanceSensorMeasurementModel sensor_three{SENSOR_THREE_ANGLE, SENSOR_THREE_RADIUS, 8, 15};
+  // DistanceSensorMeasurementModel sensor_four{SENSOR_FOUR_ANGLE, SENSOR_FOUR_RADIUS, 8, 15};
+
+
+
+  DistanceSensorMeasurementModel sensor_one{SENSOR_ONE_ANGLE, SENSOR_ONE_RADIUS, SENSOR_ONE_BEAM_ANGLE, 8, 15};
+  DistanceSensorMeasurementModel sensor_two{SENSOR_TWO_ANGLE, SENSOR_TWO_RADIUS, SENSOR_TWO_BEAM_ANGLE, 8, 15};
+  DistanceSensorMeasurementModel sensor_three{SENSOR_THREE_ANGLE, SENSOR_THREE_RADIUS, SENSOR_THREE_BEAM_ANGLE,  8, 15};
+  DistanceSensorMeasurementModel sensor_four{SENSOR_FOUR_ANGLE, SENSOR_FOUR_RADIUS, SENSOR_FOUR_BEAM_ANGLE, 8, 15};
 
 
 
@@ -163,8 +170,8 @@ public:
   KalmanFilter() {
     state.setZero();
 
-    state.x() = 1;
-    state.y() = 1; 
+    state.x() = 4;
+    state.y() = 4; 
     state.theta() = 0;
     state.yaw_bias() = 0;
 
@@ -174,11 +181,11 @@ public:
     // state_cov(State::X, State::X) = 0.0005;
     // state_cov(State::Y, State::Y) = 0.0005;
 
-    state_cov(State::X, State::X) = 0.0005;
-    state_cov(State::Y, State::Y) = 0.0005;
+    // state_cov(State::X, State::X) = 0.0005;
+    // state_cov(State::Y, State::Y) = 0.0005;
 
-    // state_cov(State::X, State::X) = 1;
-    // state_cov(State::Y, State::Y) = 1;
+    state_cov(State::X, State::X) = 0.5;
+    state_cov(State::Y, State::Y) = 0.5;
 
     state_cov(State::VX, State::VX) = 0.3;
     state_cov(State::VY, State::VY) = 0.3;
