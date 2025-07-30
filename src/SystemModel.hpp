@@ -222,9 +222,9 @@ protected:
 
       this->W.setIdentity();
 
-      if (fabs(sqrt(x.vx()*x.vx() + x.vy()*x.vy() + x.omega()*x.omega())) < 0.1) {
-	this->W(S::X , S::X) /= 5;
-	this->W(S::Y , S::Y) /= 5;
+      if (fabs(sqrt(x.vx()*x.vx() + x.vy()*x.vy() + x.omega()*x.omega())) < 0.01) {
+	this->W(S::X , S::X) /= 4;
+	this->W(S::Y , S::Y) /= 4;
       }
 
 

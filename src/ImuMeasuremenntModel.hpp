@@ -45,7 +45,6 @@ namespace Robot {
       // this->V.set();
 
       this->V.setIdentity();
-      //      this->V(M::YAW, M::YAW) = 0.01;
     }
 
     M h(const S& x) const {

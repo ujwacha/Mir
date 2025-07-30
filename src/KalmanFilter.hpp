@@ -129,12 +129,12 @@ private:
   // Use GNU octave signal package and butter function
 
   // currently, we already get filtered data 
-  double omega_bs[2] = {0.086364, 0.086364};
-  double omega_as[2] = {1.0000, -0.8273};
-  filter<1> omega_l_lpf{omega_bs, omega_as};
-  filter<1> omega_r_lpf{omega_bs, omega_as};
-  filter<1> omega_m_lpf{omega_bs, omega_as};
-  filter<1> yaw_lpf{omega_bs, omega_as};
+  // double omega_bs[2] = {0.086364, 0.086364};
+  // double omega_as[2] = {1.0000, -0.8273};
+  // filter<1> omega_l_lpf{omega_bs, omega_as};
+  // filter<1> omega_r_lpf{omega_bs, omega_as};
+  // filter<1> omega_m_lpf{omega_bs, omega_as};
+  // filter<1> yaw_lpf{omega_bs, omega_as};
 
   double accel_bs[3] = {9.4469e-04, 1.8894e-03, 9.4469e-04};
   double accel_as[3] = {1.0000, -1.9112, 0.9150};
@@ -154,33 +154,36 @@ public:
   KalmanFilter() {
     state.setZero();
 
-    state.x() = 4;
-    state.y() = 4; 
+    state.x() = 1;
+    state.y() = 1; 
     state.theta() = 0;
     state.yaw_bias() = 0;
 
     state_cov.setIdentity();
     state_cov /= 10;
 
-    // state_cov(State::X, State::X) = 0.0005;
-    // state_cov(State::Y, State::Y) = 0.0005;
-
     state_cov(State::X, State::X) = 0.0005;
     state_cov(State::Y, State::Y) = 0.0005;
+
+    // state_cov(State::X, State::X) = 0.05;
+    // state_cov(State::Y, State::Y) = 0.05;
+
+   // state_cov(State::X, State::X) = 0.05;
+    // state_cov(State::Y, State::Y) = 0.05;
 
     // state_cov(State::X, State::X) = 1;
     // state_cov(State::Y, State::Y) = 1;
 
-    state_cov(State::VX, State::VX) = 0.3;
-    state_cov(State::VY, State::VY) = 0.3;
-    state_cov(State::OMEGA, State::OMEGA) = 0.3;
+    state_cov(State::VX, State::VX) = 0.1;
+    state_cov(State::VY, State::VY) = 0.1;
+    state_cov(State::OMEGA, State::OMEGA) = 0.05;
     state_cov(State::THETA, State::THETA) = 0.0005;
-    state_cov(State::AX, State::AX) = 1;
-    state_cov(State::AY, State::AY) = 1;
-    state_cov(State::YAW_BIAS, State::YAW_BIAS) = 1e-6;
+    state_cov(State::AX, State::AX) = 0.1;
+    state_cov(State::AY, State::AY) = 0.1;
+    state_cov(State::YAW_BIAS, State::YAW_BIAS) = 1e-5;
 
-    imu_cov(ImuMeasurement::AX, ImuMeasurement::AX) = 1;
-    imu_cov(ImuMeasurement::AY, ImuMeasurement::AY) = 1;
+    imu_cov(ImuMeasurement::AX, ImuMeasurement::AX) = 0.1;
+    imu_cov(ImuMeasurement::AY, ImuMeasurement::AY) = 0.1;
     imu_cov(ImuMeasurement::YAW, ImuMeasurement::YAW) = 0.00001;
 
     // set covariance of IMU
@@ -200,6 +203,37 @@ public:
     twist.romega() = t.z;
 
     x_ekf = ekf.predict(sys, twist, time);
+  }
+
+  void covariance_increase(bool increment) {
+    state_cov.setIdentity();
+    state_cov /= 10;
+
+    if (increment) {
+      state_cov(State::X, State::X) = 5;
+      state_cov(State::Y, State::Y) = 5;
+    } else  {
+      state_cov(State::X, State::X) = 0.0005;
+      state_cov(State::Y, State::Y) = 0.0005;
+    }
+    // state_cov(State::X, State::X) = 0.05;
+    // state_cov(State::Y, State::Y) = 0.05;
+
+   // state_cov(State::X, State::X) = 0.05;
+    // state_cov(State::Y, State::Y) = 0.05;
+
+    // state_cov(State::X, State::X) = 1;
+    // state_cov(State::Y, State::Y) = 1;
+
+    state_cov(State::VX, State::VX) = 0.1;
+    state_cov(State::VY, State::VY) = 0.1;
+    state_cov(State::OMEGA, State::OMEGA) = 0.05;
+    state_cov(State::THETA, State::THETA) = 0.0005;
+    state_cov(State::AX, State::AX) = 0.1;
+    state_cov(State::AY, State::AY) = 0.1;
+    state_cov(State::YAW_BIAS, State::YAW_BIAS) = 1e-5;
+
+
   }
 
   void imu_update(ImuData msg, double time) {
@@ -236,37 +270,50 @@ public:
     sensor_two_measurement.d1() = msg.d_two;
     sensor_three_measurement.d1() = msg.d_three;
     sensor_four_measurement.d1() = msg.d_four;
-    bool use_mahalanobis = true;
+    bool use_mahalanobis = false;
     // if (count < 30)
     // 	use_mahalanobis = false;
 
     std::vector<double> distances;
     unsigned int mask = 0;
     const double single_radius = 1;
-    const double radius = 1.4 * single_radius;
+    const double radius = 1.2 * single_radius;
+    //const double radius = 1.4 * single_radius;
     const double divider = 200;
 
+
+    // if (msg.works_one ) 
+    //  x_ekf = ekf.update(current, current_measurement, time, use_mahalanobis,
+
+    std::cout << "SENSOR 1" << std::endl;
     if (msg.works_one && (ekf.get_mahalanobis(sensor_one, sensor_one_measurement) <
                    single_radius * single_radius)) {
       distances.push_back(sensor_one_measurement.d1());
+      std::cout << "SENSOR 1 MAHALANOBIS PASSED" << std::endl;
       mask = mask | SENSOR_ONE;
     }
 
+    std::cout << "SENSOR 2" << std::endl;
     if (msg.works_two && (ekf.get_mahalanobis(sensor_two, sensor_two_measurement) <
                    single_radius * single_radius)) {
       distances.push_back(sensor_two_measurement.d1());
+      std::cout << "SENSOR 2 MAHALANOBIS PASSED" << std::endl;
       mask = mask | SENSOR_TWO;
     }
 
+    std::cout << "SENSOR 3" << std::endl;
     if (msg.works_three && (ekf.get_mahalanobis(sensor_three, sensor_three_measurement) <
                    single_radius * single_radius)) {
       distances.push_back(sensor_three_measurement.d1());
+      std::cout << "SENSOR 3 MAHALANOBIS PASSED" << std::endl;
       mask = mask | SENSOR_THREE;
     }
 
+    std::cout << "SENSOR 4" << std::endl;
     if (msg.works_four && (ekf.get_mahalanobis(sensor_four, sensor_four_measurement) <
                    single_radius * single_radius)) {
       distances.push_back(sensor_four_measurement.d1());
+      std::cout << "SENSOR 4 MAHALANOBIS PASSED" << std::endl;
       mask = mask | SENSOR_FOUR;
     }
     std::cout << "working_distances:" << distances.size() << " mask: " << mask
@@ -285,6 +332,8 @@ public:
       x_ekf = ekf.update(current, current_measurement, time, use_mahalanobis,
                          radius);
 
+      std::cout << "[DISTANCE SENSORS]: 1" << std::endl;
+
     } else if (distances.size() == 2) {
 
       TwoSensorsMeasurementModel current = get_sensor_two(mask);
@@ -298,6 +347,7 @@ public:
       x_ekf = ekf.update(current, current_measurement, time, use_mahalanobis,
                          radius);
 
+      std::cout << "[DISTANCE SENSORS]: 2" << std::endl;
     } else if (distances.size() == 3) {
 
       TFMiniMeasurementModel current = get_sensor_three(mask);
@@ -311,6 +361,7 @@ public:
       current.setCovariance(current_one_cov);
       x_ekf = ekf.update(current, current_measurement, time, use_mahalanobis,
                          radius);
+      std::cout << "[DISTANCE SENSORS]: 3" << std::endl;
 
     } else if (distances.size() == 4) {
 
@@ -326,6 +377,8 @@ public:
       current.setCovariance(current_one_cov);
       x_ekf = ekf.update(current, current_measurement, time, use_mahalanobis,
                          radius);
+
+      std::cout << "[DISTANCE SENSORS]: 4" << std::endl;
     }
   }
 };

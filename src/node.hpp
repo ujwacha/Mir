@@ -5,6 +5,7 @@
 #include "sensor_msgs/msg/imu.hpp"
 #include "tf2/LinearMath/Matrix3x3.h"
 #include "tf2/LinearMath/Quaternion.h"
+#include "std_msgs/msg/bool.hpp"  
 #include <cmath>
 #include <geometry_msgs/msg/vector3.hpp>
 #include <rclcpp/executors.hpp>
@@ -33,6 +34,8 @@
 
 
 #define WHEEL_D 0.0574
+#define DEG2RAD 0.0174533
+
 
 class Sayer : public rclcpp::Node {
 private:
@@ -40,17 +43,19 @@ private:
   rclcpp::TimerBase::SharedPtr timer;
   rclcpp::TimerBase::SharedPtr timer_predict;
   double prev_time;
-
+  bool time_set = false;
  
   KalmanFilter Kalman;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher;
+  rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr vel_publisher;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr cooked_subscriber_;
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
   // Create controller instance
   Controller controller_model{
-      -8.9/100,  -17.6/100, 0,        // Wheel 1 position and angle
-      13.81/100, 0.61/100,  M_PI / 2, // Wheel 2 position and angle
-      7.3/100,   16.4/100,  0,        // Wheel 3 position and angle
+      -6.4/100,  -20.5/100, 0,        // Wheel 1 position and angle
+      20.8/100, 1.7/100,  M_PI / 2, // Wheel 2 position and angle
+      -5.2/100,   24.7/100,  0,        // Wheel 3 position and angle
       WHEEL_D / 2                         // Wheel radius
   };
 
@@ -64,82 +69,112 @@ public:
 
 
     sensors_sub = this->create_subscription<sick_interfaces::msg::AllSensors>(
-        "sensors", currentqol,
+        "r2_sensor_msg", currentqol,
         std::bind(&Sayer::sensors_subscription_callback, this,
                   std::placeholders::_1));
 
-    timer =
-        this->create_wall_timer(std::chrono::milliseconds(10),
-                                std::bind(&Sayer::publish, this));
+    timer = this->create_wall_timer(std::chrono::milliseconds(10),
+				    std::bind(&Sayer::publish, this));
+
+    cooked_subscriber_ = this->create_subscription<std_msgs::msg::Bool>(
+        "cooked", // Topic name
+        10,       // Queue size
+        std::bind(&Sayer::cooked_callback, this,
+                  std::placeholders::_1));
 
     odom_publisher =
-        this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
+        this->create_publisher<nav_msgs::msg::Odometry>("r2/odom", 10);
     tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
-    prev_time = 0;
+    vel_publisher =
+        this->create_publisher<geometry_msgs::msg::Vector3>("r2_velosity", 10);
+    tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+
+    prev_time = 0.0f;
     // initial_time = time.n();
   }
 
+  void
+  cooked_callback(const std_msgs::msg::Bool::SharedPtr msg) {
+    // Handle the received boolean message
+    bool is_cooked = msg->data;
+    RCLCPP_INFO(this->get_logger(), "Received cooked status: %s",
+                is_cooked ? "true" : "false");
 
-  void sensors_subscription_callback(const sick_interfaces::msg::AllSensors msg) {
-    if (msg.timestamp_seconds < prev_time) return;
+    //    Kalman.covariance_increase(is_cooked);
+  }
+
+  void
+  sensors_subscription_callback(const sick_interfaces::msg::AllSensors msg) {
+
+    if (!time_set) {
+      prev_time = msg.timestamp_seconds;
+      time_set = true;
+      return;
+    }
+
+    if (msg.timestamp_seconds < prev_time)
+      return;
 
     RCLCPP_INFO(this->get_logger(), "Sensor Msg Recieved");
 
     double time_difference = msg.timestamp_seconds - prev_time;
     prev_time = msg.timestamp_seconds;
 
+    auto tw =
+        controller_model.get_output(msg.omegas.x, msg.omegas.y, msg.omegas.z);
 
-    auto tw = controller_model.get_output(msg.omegas.x,
-					  msg.omegas.y,
-					  msg.omegas.z);
-    
     Twist_msg twist_msg;
 
+    geometry_msgs::msg::Vector3 vel_msg;
+
     twist_msg.x = tw.vx;
-    twist_msg.y = tw.vx;
-    twist_msg.z = tw.vx;
+    twist_msg.y = tw.vy;
+    twist_msg.z = tw.w;
+
+    vel_msg.x = fabs(tw.vx) < 0.01 ? 0 : tw.vx;
+    vel_msg.y = fabs(tw.vy) < 0.01 ? 0 : tw.vy;
+    vel_msg.z = fabs(tw.w) < 0.01 ? 0 : tw.w;
+
+    vel_publisher->publish(vel_msg);
 
     Kalman.predict(twist_msg, time_difference);
     RCLCPP_INFO(this->get_logger(), "Predicted");
 
     ImuData imu_data;
 
-    imu_data.roll = msg.imu_euler.x;
-    imu_data.pitch = msg.imu_euler.y;
-    imu_data.yaw = msg.imu_euler.z;
-    
+    imu_data.roll = msg.imu_euler.y * DEG2RAD;
+    imu_data.pitch = msg.imu_euler.x * DEG2RAD;
+    imu_data.yaw = msg.imu_euler.z * DEG2RAD;
+
     imu_data.accel_x = msg.imu_accel.x;
     imu_data.accel_y = msg.imu_accel.y;
     imu_data.accel_z = msg.imu_accel.z;
-    
+
     Kalman.imu_update(imu_data, time_difference);
     RCLCPP_INFO(this->get_logger(), "Updated IMU");
 
-    if (!msg.is_sick_latest) return;
+    if (!msg.is_sick_latest)
+      return;
 
     Sick sick;
 
-
-    sick.d_one = msg.sick_data.distance_one/100;
+    sick.d_one = msg.sick_data.distance_one / 100;
     sick.works_one = msg.sick_data.works_one;
 
-    sick.d_two = msg.sick_data.distance_two/100;
+    sick.d_two = msg.sick_data.distance_two / 100;
     sick.works_two = msg.sick_data.works_two;
 
-    sick.d_three = msg.sick_data.distance_three/100;
+    sick.d_three = msg.sick_data.distance_three / 100;
     sick.works_three = msg.sick_data.works_three;
 
-    sick.d_four = msg.sick_data.distance_four/100;
-    sick.works_four= msg.sick_data.works_four;
+    sick.d_four = msg.sick_data.distance_four / 100;
+    sick.works_four = msg.sick_data.works_four;
 
-
-    
     Kalman.distance_update(sick, time_difference);
 
     RCLCPP_INFO(this->get_logger(), "Updated SICK");
   }
-
 
   void publish() {
     // Calculate elapsed time
@@ -190,7 +225,6 @@ public:
     msg.twist.twist.linear.z = 0.0;
 
     msg.twist.twist.angular.z = Kalman.x_ekf[State::OMEGA];
-
 
     // Covariance matrices (set to zero for simplicity)
     // send the covariance from kalman filter later to see ellipse in rviz
